@@ -8,10 +8,15 @@
  */
 import React from "react";
 import { View, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetwork } from "@/contexts/Networkcontext";
 
 export function OfflineBanner() {
   const { isConnected, isInternetReachable } = useNetwork();
+  // The banner sits above the navigator, outside every SafeAreaView, so it
+  // has to reserve the status-bar space itself — otherwise the clock and
+  // battery icons are drawn straight over the "No internet connection" text.
+  const insets = useSafeAreaInsets();
 
   // isInternetReachable can be `null` right after app launch, before the
   // first real check completes — treat that as "assume online" rather
@@ -21,16 +26,21 @@ export function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <View
-      style={{
-        backgroundColor: "#991B1B",
-        paddingVertical: 6,
-        alignItems: "center",
-      }}
-    >
-      <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "600" }}>
-        No internet connection
-      </Text>
+    // Top inset keeps the red stripe clear of the clock/battery row — the
+    // strip above it stays the normal screen colour, so only the message
+    // itself is red (as in the mockup) instead of a full red status bar.
+    <View style={{ paddingTop: insets.top, backgroundColor: "#D8F3DC" }}>
+      <View
+        style={{
+          backgroundColor: "#991B1B",
+          paddingVertical: 6,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "600" }}>
+          No internet connection
+        </Text>
+      </View>
     </View>
   );
 }

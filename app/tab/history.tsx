@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
+import { markTutorialStep } from "@/utils/tutorial";
 import { GuestPrompt } from "@/components/GuestPrompt";
 
 type ScanItem = {
@@ -24,6 +25,9 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadScans();
+      // Opening History completes the tutorial's "History" step (no-op for
+      // guests and accounts the guide isn't enrolled in).
+      markTutorialStep("history");
     }, [])
   );
 
@@ -93,7 +97,7 @@ export default function HistoryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
       <View className="py-4 items-center" style={{ backgroundColor: "#FFFFFF" }}>
-        <Text className="text-xl font-bold" style={{ color: "#1B4332" }}>
+        <Text className="text-2xl font-bold" style={{ color: "#1B4332" }}>
           History
         </Text>
       </View>
@@ -124,25 +128,31 @@ export default function HistoryScreen() {
             >
               <Image
                 source={{ uri: item.image_url }}
-                style={{ width: 64, height: 64, borderRadius: 12 }}
+                style={{ width: 94, height: 74, borderRadius: 12 }}
               />
               <View className="flex-1 ml-3">
-                <Text className="font-bold" style={{ color: "#1B4332" }}>
+                <Text
+                  className="font-bold"
+                  style={{ color: "#1B4332", fontSize: 17 }}
+                >
                   {item.name}
                 </Text>
-                <Text className="text-xs" style={{ color: "#374151" }}>
+                <Text style={{ color: "#374151", fontSize: 14 }}>
                   Accuracy: {item.accuracy}%
                 </Text>
-                <Text className="text-xs mt-1" style={{ color: "#6b7280" }}>
+                <Text
+                  className="mt-2"
+                  style={{ color: "#6b7280", fontSize: 13 }}
+                >
                   Date: {formatDate(item.date)}
                 </Text>
-                <Text className="text-xs" style={{ color: "#6b7280" }}>
+                <Text style={{ color: "#6b7280", fontSize: 13 }}>
                   Time: {formatTime(item.time)}
                 </Text>
               </View>
               <Image
                 source={require("@/assets/images/icons/Chevron_right3.png")}
-                style={{ width: 18, height: 18 }}
+                style={{ width: 22, height: 22 }}
                 resizeMode="contain"
               />
             </Pressable>

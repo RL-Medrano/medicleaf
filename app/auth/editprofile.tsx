@@ -25,6 +25,14 @@ import { checkIsOnline } from "@/utils/network";
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// The avatar circle in the mockup is about half the screen width.
+const AVATAR_SIZE = 170;
+
 const MIN_BIRTH_YEAR_AGO = 120; // oldest selectable birthdate
 const today = new Date();
 const MAX_DATE = today; // can't be born in the future
@@ -47,16 +55,14 @@ function dateToDb(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// "May 19, 1999" — the format shown in the mockup.
 function dateToDisplay(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${month}/${day}/${date.getFullYear()}`;
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
 export default function EditProfileScreen() {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
   const [birthdate, setBirthdate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   // Only used on iOS: the spinner updates this as the user scrolls, and
@@ -97,8 +103,6 @@ export default function EditProfileScreen() {
       router.back();
       return;
     }
-
-    setEmail(user.email ?? "");
 
     const { data } = await supabase
       .from("profiles")
@@ -242,28 +246,6 @@ export default function EditProfileScreen() {
         return;
       }
 
-      if (email.trim() && email.trim() !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: email.trim(),
-        });
-
-        if (emailError) {
-          Alert.alert(
-            "Profile saved",
-            `Your profile was saved, but the email update failed: ${emailError.message}`
-          );
-          router.back();
-          return;
-        }
-
-        Alert.alert(
-          "Profile saved",
-          "Check your new email address to confirm the change."
-        );
-        router.back();
-        return;
-      }
-
       router.back();
     } catch (err) {
       console.error("[editprofile] save failed:", err);
@@ -322,9 +304,9 @@ export default function EditProfileScreen() {
                 : require("@/assets/images/icons/place_holder.png")
             }
             style={{
-              width: 110,
-              height: 110,
-              borderRadius: 55,
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
+              borderRadius: AVATAR_SIZE / 2,
               backgroundColor: "#D1D5DB",
             }}
           />
@@ -352,19 +334,6 @@ export default function EditProfileScreen() {
             onChangeText={setUsername}
             autoCapitalize="none"
             autoComplete="username"
-            className="rounded-xl px-4 py-3 mb-4"
-            style={{ backgroundColor: "#FFFFFF", color: "#1B4332" }}
-          />
-
-          <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
-            Email
-          </Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
             className="rounded-xl px-4 py-3 mb-4"
             style={{ backgroundColor: "#FFFFFF", color: "#1B4332" }}
           />

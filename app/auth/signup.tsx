@@ -17,6 +17,7 @@ import Checkbox from "expo-checkbox";
 import DateTimePicker from "@expo/ui/community/datetime-picker";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
+import { enableTutorial } from "@/utils/tutorial";
 import { TermsModal } from "@/components/TermsModal";
 
 export default function SignupScreen() {
@@ -135,6 +136,13 @@ export default function SignupScreen() {
         }
         return;
       }
+
+      // Brand-new account → enroll it in the first-run Tutorial Guide on
+      // Home. Stored per user id, so logging out and back in later doesn't
+      // bring the guide back once it's finished. Runs before the email
+      // confirmation check on purpose: the account exists either way, and
+      // the flag only matters once this user reaches Home.
+      if (data.user?.id) await enableTutorial(data.user.id);
 
       if (data.session) {
         // Confirm email is off (or was toggled off) — session issued

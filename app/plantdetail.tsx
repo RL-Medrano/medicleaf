@@ -1,12 +1,23 @@
-import React, { useRef, useState } from "react";
-import { View, Text, Image, Pressable, ScrollView, StatusBar, LayoutChangeEvent } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  LayoutChangeEvent,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { getPlantById } from "@/data/plants";
 import { CachedPlantImageGallery } from "@/components/CachedPlantImage";
 
-const TABS = ["Overview", "Benefits", "How to use"] as const;
+const TABS = ["About", "Benefits", "How to use"] as const;
 type Tab = (typeof TABS)[number];
+
+// Characters of the About text shown before it collapses behind "…More".
+const ABOUT_COLLAPSED_CHARS = 320;
 
 export default function PlantDetailScreen() {
   // NOTE: this used to read `plantId`, but every screen that navigates
@@ -15,15 +26,28 @@ export default function PlantDetailScreen() {
   // and as the `id` field in data/plants.ts's PLANTS array. Reading
   // `plantId` here meant this param was always undefined in practice.
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>("Overview");
+  const [activeTab, setActiveTab] = useState<Tab>("About");
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [aboutExpanded, setAboutExpanded] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   // Y-position of each section within the scroll content, captured via onLayout
   const sectionY = useRef<Record<Tab, number>>({
-    Overview: 0,
+    About: 0,
     Benefits: 0,
     "How to use": 0,
   });
+
+  // Fresh state per plant: hero gallery back on slide 1, About collapsed.
+  useEffect(() => {
+    setHeroIndex(0);
+    setAboutExpanded(false);
+  }, [slug]);
+
+  // Hero slide size is measured from the real container (onLayout) instead of
+  // computed from screen width — even a sub-pixel mismatch would let the
+  // neighboring slide peek out at the edge, which the mockup doesn't have.
+  const [heroWidth, setHeroWidth] = useState(0);
 
   // getPlantById expects the same string as plant_info.json's keys —
   // e.g. "lagundi", "Aratiles" — since ids in data/plants.ts were
@@ -41,7 +65,7 @@ export default function PlantDetailScreen() {
         <View className="flex-row items-center px-5 mt-4">
           <Pressable onPress={() => router.back()} className="mr-4">
             <Image
-              source={require("@/assets/images/icons/Chevron_left.png")}
+              source={require("@/assets/images/icons/arrow_left.png")}
               style={{ width: 20, height: 20 }}
               resizeMode="contain"
             />
@@ -53,6 +77,15 @@ export default function PlantDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  // About text is collapsed behind an inline "…More" until tapped.
+  const aboutTruncated = plant.about.length > ABOUT_COLLAPSED_CHARS;
+  const aboutSlice = plant.about.slice(0, ABOUT_COLLAPSED_CHARS);
+  const aboutCutAt = aboutSlice.lastIndexOf(" ");
+  const aboutPreview =
+    aboutTruncated && !aboutExpanded
+      ? `${aboutSlice.slice(0, aboutCutAt > 160 ? aboutCutAt : aboutSlice.length).trim()}…`
+      : plant.about;
 
   function handleTabPress(tab: Tab) {
     setActiveTab(tab);
@@ -69,60 +102,100 @@ export default function PlantDetailScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
 
-      <View className="flex-row items-center px-5 mt-4">
-        <Pressable onPress={() => router.back()} className="mr-4">
+      <View className="flex-row items-center px-8 mt-4">
+        <Pressable onPress={() => router.back()} hitSlop={12}>
           <Image
-            source={require("@/assets/images/icons/Chevron_left.png")}
-            style={{ width: 20, height: 20 }}
+            source={require("@/assets/images/icons/arrow_left.png")}
+            style={{ width: 24, height: 24 }}
             resizeMode="contain"
           />
         </Pressable>
-        <Text className="text-xl font-bold" style={{ color: "#1B4332" }}>
+        <Text
+          className="flex-1 text-xl font-bold text-center"
+          style={{ color: "#1A1A1A", marginRight: 24 }}
+        >
           {plant.name}
         </Text>
       </View>
 
-      <ScrollView ref={scrollRef} className="flex-1 px-5" showsVerticalScrollIndicator={false}>
-        {/* Hero card */}
+      <ScrollView ref={scrollRef} className="flex-1 px-8" showsVerticalScrollIndicator={false}>
+        {/* Hero image — full-width, matches the mockup; falls back to the
+            gray "No image available" box when the Cloudinary photo is missing.
+            The wrapper clips (overflow hidden + rounded corners) so no part of
+            a neighboring slide can ever stick out past the image box. */}
         <View
-          className="rounded-2xl mt-5 flex-row overflow-hidden"
-          style={{ backgroundColor: "#FFFFFF" }}
+          className="mt-5"
+          onLayout={(e) => setHeroWidth(e.nativeEvent.layout.width)}
+          style={{ overflow: "hidden", borderRadius: 16 }}
         >
-          <CachedPlantImageGallery
-            plantId={plant.id}
-            imageUrls={plant.images}
-            slideStyle={{ width: 140, height: 140 }}
-          />
-          <View className="flex-1 justify-center px-4">
-            <Text className="text-lg font-bold" style={{ color: "#1B4332" }}>
-              {plant.name}
-            </Text>
-            <Text className="text-sm mt-1 italic" style={{ color: "#374151" }}>
-              {plant.scientific_name}
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: "#6b7280" }}>
-              {plant.family}
-            </Text>
-          </View>
+          {heroWidth > 0 && (
+            <CachedPlantImageGallery
+              key={plant.id}
+              plantId={plant.id}
+              imageUrls={plant.images}
+              slideStyle={{
+                width: heroWidth,
+                height: Math.round(heroWidth * 1.2),
+                borderRadius: 16,
+              }}
+              hideDots
+              onIndexChange={setHeroIndex}
+            />
+          )}
         </View>
 
-        {/* Tabs — tapping scrolls to the matching section below, all content stays visible */}
-        <View className="flex-row mt-5 mb-4">
+        {/* Name + scientific name, with the gallery dots on the right */}
+        <View className="flex-row items-center mt-5">
+          <View className="flex-1 mr-3">
+            <Text style={{ fontSize: 26, fontWeight: "bold", color: "#1A1A1A" }}>
+              {plant.name}
+            </Text>
+            <Text className="mt-1" style={{ fontSize: 14, color: "#6b7280" }}>
+              {plant.scientific_name}
+            </Text>
+          </View>
+          {plant.images.length > 1 && (
+            <View
+              className="flex-row items-center rounded-full px-2.5 py-1.5"
+              style={{ backgroundColor: "#FFFFFF" }}
+            >
+              {plant.images.map((_, index) => (
+                <View
+                  key={index}
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 4,
+                    marginHorizontal: 3,
+                    backgroundColor: index === heroIndex ? "#1A1A1A" : "#D1D5DB",
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Tabs — white bar with an inset active pill, per mockup;
+            tapping scrolls to the section below */}
+        <View
+          className="flex-row mt-5 mb-4 p-1"
+          style={{ backgroundColor: "#FFFFFF", borderRadius: 999 }}
+        >
           {TABS.map((tab) => {
             const active = activeTab === tab;
             return (
               <Pressable
                 key={tab}
                 onPress={() => handleTabPress(tab)}
-                className="mr-6 pb-2"
+                className="flex-1 items-center py-2.5"
                 style={{
-                  borderBottomWidth: active ? 2 : 0,
-                  borderBottomColor: "#1B4332",
+                  backgroundColor: active ? "#1B4332" : "transparent",
+                  borderRadius: 12,
                 }}
               >
                 <Text
-                  className="text-sm font-semibold"
-                  style={{ color: active ? "#1B4332" : "#9ca3af" }}
+                  className="font-semibold"
+                  style={{ fontSize: 14, color: active ? "#FFFFFF" : "#1B4332" }}
                 >
                   {tab}
                 </Text>
@@ -131,34 +204,20 @@ export default function PlantDetailScreen() {
           })}
         </View>
 
-        {/* Overview section */}
-        <View onLayout={recordSectionY("Overview")}>
+        {/* About section */}
+        <View onLayout={recordSectionY("About")}>
           <View className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF" }}>
-            <Text className="font-bold mb-2" style={{ color: "#1B4332" }}>
+            <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 16 }}>
               About
             </Text>
-            <Text className="text-sm leading-5" style={{ color: "#374151" }}>
-              {plant.about}
-            </Text>
-          </View>
-
-          <View className="rounded-2xl p-4 mt-3" style={{ backgroundColor: "#FFFFFF" }}>
-            <Text className="font-bold mb-2" style={{ color: "#1B4332" }}>
-              Active Compounds
-            </Text>
-            <View className="flex-row flex-wrap">
-              {plant.activeCompounds.map((compound, i) => (
-                <View
-                  key={i}
-                  className="rounded-full px-3 py-1 mr-2 mb-2"
-                  style={{ backgroundColor: "#D8F3DC" }}
-                >
-                  <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
-                    {compound}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <Pressable onPress={() => aboutTruncated && setAboutExpanded(true)}>
+              <Text className="leading-6" style={{ color: "#374151", fontSize: 15 }}>
+                {aboutPreview}
+                {aboutTruncated && !aboutExpanded && (
+                  <Text style={{ fontWeight: "bold", color: "#1A1A1A" }}>…More</Text>
+                )}
+              </Text>
+            </Pressable>
           </View>
 
           <View className="rounded-2xl p-4 mt-3" style={{ backgroundColor: "#B7E4C7" }}>

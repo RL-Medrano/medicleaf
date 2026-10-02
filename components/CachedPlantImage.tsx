@@ -96,13 +96,14 @@ function ImageFallback({ style }: { style?: StyleProp<ImageStyle> }) {
         style={{
           fontSize: 16,
           fontWeight: "bold",
-          color: "#1A1A1A",
+          // White on the gray placeholder — matches the mockup (was near-black).
+          color: "#FFFFFF",
           textAlign: "center",
           paddingHorizontal: 8,
         }}
         numberOfLines={2}
       >
-        No image{"\n"}available
+        No image available
       </Text>
     </View>
   );
@@ -236,9 +237,19 @@ type GalleryProps = {
   imageUrls: string[]; // 1 to 3 photo urls
   /** Size of each slide in the inline (non-fullscreen) carousel. */
   slideStyle: StyleProp<ImageStyle>;
+  /** Skip the dots under the carousel when the caller renders its own. */
+  hideDots?: boolean;
+  /** Reports the visible slide index as the user swipes the inline carousel. */
+  onIndexChange?: (index: number) => void;
 };
 
-export function CachedPlantImageGallery({ plantId, imageUrls, slideStyle }: GalleryProps) {
+export function CachedPlantImageGallery({
+  plantId,
+  imageUrls,
+  slideStyle,
+  hideDots = false,
+  onIndexChange,
+}: GalleryProps) {
   const { width: screenWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -258,6 +269,7 @@ export function CachedPlantImageGallery({ plantId, imageUrls, slideStyle }: Gall
   function handleInlineScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(event.nativeEvent.contentOffset.x / slideWidth);
     setActiveIndex(index);
+    onIndexChange?.(index);
   }
 
   function handlePreviewScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -286,7 +298,7 @@ export function CachedPlantImageGallery({ plantId, imageUrls, slideStyle }: Gall
         ))}
       </ScrollView>
 
-      {imageUrls.length > 1 && (
+      {!hideDots && imageUrls.length > 1 && (
         <View className="flex-row justify-center mt-2">
           {imageUrls.map((_, index) => (
             <View

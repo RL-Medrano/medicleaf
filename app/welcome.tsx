@@ -81,6 +81,9 @@ export default function WelcomeScreen() {
 
       await routeAfterAuth(session.user.id);
     } catch (err: any) {
+      // The redirect may have already left this screen for /auth/callback —
+      // if the exchange failed we'd otherwise sit there until its timeout.
+      router.replace("/welcome");
       Alert.alert("Google sign-in failed", err.message || "Please try again.");
     } finally {
       setGoogleLoading(false);

@@ -340,9 +340,11 @@ export default function ScanResultScreen() {
         <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
         <View className="flex-row items-center mt-4 px-5">
           <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Text className="text-2xl" style={{ color: "#1B4332" }}>
-              ←
-            </Text>
+            <Image
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 26, height: 26 }}
+              resizeMode="contain"
+            />
           </Pressable>
         </View>
         <View className="flex-1 items-center justify-center px-8">
@@ -388,9 +390,11 @@ export default function ScanResultScreen() {
       <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
         <View className="flex-row items-center mt-4">
           <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Text className="text-2xl" style={{ color: "#1B4332" }}>
-              ←
-            </Text>
+            <Image
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 26, height: 26 }}
+              resizeMode="contain"
+            />
           </Pressable>
           <Text
             className="flex-1 text-center text-xl font-bold mr-6"

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  Image,
   TextInput,
   Pressable,
   Alert,
@@ -99,7 +100,11 @@ export default function HelpSupportScreen() {
               hitSlop={12}
               style={{ position: "absolute", left: 0 }}
             >
-              <Text style={{ fontSize: 26, color: "#111" }}>←</Text>
+              <Image
+                source={require("@/assets/images/icons/arrow_left.png")}
+                style={{ width: 24, height: 24 }}
+                resizeMode="contain"
+              />
             </Pressable>
             <Text className="text-lg font-bold" style={{ color: "#000" }}>
               Help & Support

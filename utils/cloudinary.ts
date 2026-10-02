@@ -1,3 +1,6 @@
+import { File } from "expo-file-system";
+import { fetch } from "expo/fetch";
+
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
@@ -45,20 +48,16 @@ export async function uploadToCloudinary(
     );
   }
 
-  // Recommendation #2: derive the extension/mime from the actual file
-  // instead of hardcoding "image/jpeg" — matters if a user uploads a PNG
-  // from their gallery instead of taking a photo.
-  const extMatch = /\.(\w+)$/.exec(imageUri);
-  const ext = extMatch ? extMatch[1] : "jpg";
-  const mime = ext === "jpg" ? "jpeg" : ext;
-
   const formData = new FormData();
 
-  formData.append("file", {
-    uri: imageUri,
-    type: `image/${mime}`,
-    name: `${folder}_${Date.now()}.${ext}`,
-  } as any);
+  // React Native's `{ uri, type, name }` upload descriptor is NOT understood
+  // by Expo's fetch (SDK 54+): it throws
+  // "Unsupported FormDataPart implementation", which broke every Cloudinary
+  // upload (scan saves, chat images, avatar changes). expo-file-system's
+  // File implements Blob, so the multipart encoder can read its bytes() and
+  // pick up its name/type for the part headers.
+  const file = new File(imageUri);
+  formData.append("file", file);
   formData.append("upload_preset", UPLOAD_PRESET);
   formData.append("folder", folder);
 

@@ -1,17 +1,26 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, Image, Pressable, Alert, StatusBar } from "react-native";
+import { View, Text, Image, Pressable, Alert, StatusBar, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
 import { checkIsOnline } from "@/utils/network";
 import { GuestPrompt } from "@/components/GuestPrompt";
+import { Skel, SKELETON_RING, useSkeletonPulse } from "@/components/Skel";
 
 export default function ProfileScreen() {
   const [username, setUsername] = useState("User Name");
+  // "Ren Matsunagi" — firstname + lastname from the profiles row, as in the
+  // mockup. Falls back to the username for accounts that have no names yet.
+  const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
+  // True until the first loadProfile() settles. While it's on, the avatar
+  // and the name/handle render as skeleton blocks (from the mockup).
   const [loading, setLoading] = useState(true);
+
+  // Gentle pulse for those blocks so "still loading" reads clearly.
+  const skeletonPulse = useSkeletonPulse(loading);
 
   useFocusEffect(
     useCallback(() => {
@@ -20,31 +29,36 @@ export default function ProfileScreen() {
   );
 
   async function loadProfile() {
-    setLoading(true);
+    try {
+      // getAuthState() also recognises a local guest (no session at all),
+      // which getUser() would have treated as a signed-in member.
+      const { user, isGuest: guest } = await getAuthState();
+      setIsGuest(guest);
 
-    // getAuthState() also recognises a local guest (no session at all),
-    // which getUser() would have treated as a signed-in member.
-    const { user, isGuest: guest } = await getAuthState();
-    setIsGuest(guest);
+      if (guest || !user) return;
 
-    if (guest || !user) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("username, firstname, lastname, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        // A Google user who hasn't picked a username yet has null here.
+        setUsername(data.username ?? "User Name");
+        // Mockup shows the person's full name (firstname + lastname), not the
+        // handle — fall back to the handle when the names are still empty.
+        setFullName(
+          `${data.firstname ?? ""} ${data.lastname ?? ""}`.trim()
+        );
+        setAvatarUrl(data.avatar_url);
+      }
+    } finally {
+      // Skeleton until this FIRST load settles — content, an empty profile,
+      // or a failed query on a bad connection. Runs on every focus but only
+      // matters the first time; later visits refresh silently.
       setLoading(false);
-      return;
     }
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("username, avatar_url")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (data) {
-      // A Google user who hasn't picked a username yet has null here.
-      setUsername(data.username ?? "User Name");
-      setAvatarUrl(data.avatar_url);
-    }
-
-    setLoading(false);
   }
 
   function handleLogout() {
@@ -97,7 +111,7 @@ export default function ProfileScreen() {
     {
       label: "Help & Support",
       subtitle: "Get assistance and FAQs",
-      icon: require("@/assets/images/icons/help&support icon.png"),
+      icon: require("@/assets/images/icons/help support icon.png"),
       onPress: handleHelpSupport,
     },
     {
@@ -121,27 +135,52 @@ export default function ProfileScreen() {
           <GuestPrompt message="Create or Log in your account to view your profile" />
         ) : (
           <>
-            <View className="items-center mt-6">
-              <Image
-                source={
-                  avatarUrl
-                    ? { uri: avatarUrl }
-                    : require("@/assets/images/icons/place_holder.png")
-                }
-                style={{
-                  width: 110,
-                  height: 110,
-                  borderRadius: 55,
-                  backgroundColor: "#D1D5DB",
-                }}
-              />
-              <Text className="text-xl font-bold mt-3" style={{ color: "#1B4332" }}>
-                {username}
-              </Text>
-              <Text className="text-sm" style={{ color: "#6b7280" }}>
-                @{username}
-              </Text>
-            </View>
+            {loading ? (
+              // Skeleton from the mockup: moss ring + green core, with the
+              // name and handle as green pills underneath.
+              <View className="items-center mt-6">
+                <View
+                  style={{
+                    width: 110,
+                    height: 110,
+                    borderRadius: 55,
+                    backgroundColor: SKELETON_RING,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Animated.View style={{ opacity: skeletonPulse }}>
+                    <Skel w={66} h={66} />
+                  </Animated.View>
+                </View>
+                <Animated.View style={{ opacity: skeletonPulse, alignItems: "center" }}>
+                  <Skel w={200} h={24} style={{ marginTop: 14 }} />
+                  <Skel w={132} h={16} style={{ marginTop: 8 }} />
+                </Animated.View>
+              </View>
+            ) : (
+              <View className="items-center mt-6">
+                <Image
+                  source={
+                    avatarUrl
+                      ? { uri: avatarUrl }
+                      : require("@/assets/images/icons/place_holder.png")
+                  }
+                  style={{
+                    width: 110,
+                    height: 110,
+                    borderRadius: 55,
+                    backgroundColor: "#D1D5DB",
+                  }}
+                />
+                <Text className="text-xl font-bold mt-3" style={{ color: "#1B4332" }}>
+                  {fullName || username}
+                </Text>
+                <Text className="text-sm" style={{ color: "#6b7280" }}>
+                  @{username}
+                </Text>
+              </View>
+            )}
 
             <View className="rounded-2xl mt-6" style={{ backgroundColor: "#FFFFFF" }}>
               {menuItems.map((item, index) => (
@@ -160,7 +199,7 @@ export default function ProfileScreen() {
                   >
                     <Image
                       source={item.icon}
-                      style={{ width: 20, height: 20 }}
+                      style={{ width: 40, height: 40 }}
                       resizeMode="contain"
                     />
                   </View>
@@ -195,7 +234,7 @@ export default function ProfileScreen() {
                 >
                   <Image
                     source={require("@/assets/images/icons/log out icon.png")}
-                    style={{ width: 20, height: 20 }}
+                    style={{ width: 40, height: 40 }}
                     resizeMode="contain"
                   />
                 </View>
@@ -219,7 +258,7 @@ export default function ProfileScreen() {
                 >
                   <Image
                     source={require("@/assets/images/icons/delete icon.png")}
-                    style={{ width: 20, height: 20 }}
+                    style={{ width: 40, height: 40 }}
                     resizeMode="contain"
                   />
                 </View>

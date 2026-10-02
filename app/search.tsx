@@ -1,25 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, TextInput, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
-import { PLANTS, PlantTag } from "@/data/plants";
+import { markTutorialStep } from "@/utils/tutorial";
+import { getRandomPlants, PLANTS, Plant, PlantTag } from "@/data/plants";
 import { CachedPlantImage } from "@/components/CachedPlantImage";
 
 const DEFAULT_TAGS: PlantTag[] = ["Cough", "Fever", "Indigestion", "Wound", "Diabetes"];
 const MAX_RECENT_SEARCHES = 8;
-const MAX_POPULAR_CHIPS = 5;
-const POPULAR_STORAGE_KEY = "popular_search_counts";
-
-type PopularEntry = {
-  type: "tag" | "text";
-  value: string;
-  count: number;
-};
-
-type PopularCounts = Record<string, PopularEntry>;
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
@@ -32,10 +22,11 @@ export default function SearchScreen() {
   const [isFocused, setIsFocused] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Per-device popular chips (AsyncStorage — works for guests too, no Supabase cost)
-  const [popularChips, setPopularChips] = useState<PopularEntry[]>(
-    DEFAULT_TAGS.map((tag) => ({ type: "tag", value: tag, count: 0 }))
-  );
+  // Recommendations — 5 random plants, reshuffled on every visit to this
+  // screen (see the focus effect below). The ref remembers the previous
+  // set so two visits in a row don't hand out the exact same five.
+  const [recommended, setRecommended] = useState<Plant[]>(() => getRandomPlants(5));
+  const previousRecommendIds = useRef<string[]>(recommended.map((plant) => plant.id));
 
   const isSearching = query.trim().length > 0 || activeTag !== null;
   const showRecentDropdown =
@@ -43,8 +34,20 @@ export default function SearchScreen() {
 
   useEffect(() => {
     loadUserAndRecentSearches();
-    loadPopularChips();
   }, []);
+
+  // Every visit: complete the tutorial's "Library" step (no-op for guests
+  // and accounts the guide isn't enrolled in) and hand out a fresh set of
+  // 5 recommendation plants.
+  useFocusEffect(
+    useCallback(() => {
+      markTutorialStep("library");
+
+      const next = getRandomPlants(5, previousRecommendIds.current);
+      previousRecommendIds.current = next.map((plant) => plant.id);
+      setRecommended(next);
+    }, [])
+  );
 
   // ---------- Cross-device recent searches (Supabase) ----------
 
@@ -98,58 +101,6 @@ export default function SearchScreen() {
     await supabase.from("recent_searches").delete().eq("user_id", userId);
   }
 
-  // ---------- Per-device popular chips (AsyncStorage, no account needed) ----------
-
-  function rankPopularChips(counts: PopularCounts): PopularEntry[] {
-    const ranked = Object.values(counts).sort((a, b) => b.count - a.count);
-    const top = ranked.slice(0, MAX_POPULAR_CHIPS);
-
-    // Fill any remaining slots with the defaults, skipping ones already present
-    if (top.length < MAX_POPULAR_CHIPS) {
-      const usedValues = new Set(top.map((entry) => entry.value.toLowerCase()));
-      for (const tag of DEFAULT_TAGS) {
-        if (top.length >= MAX_POPULAR_CHIPS) break;
-        if (!usedValues.has(tag.toLowerCase())) {
-          top.push({ type: "tag", value: tag, count: 0 });
-        }
-      }
-    }
-
-    return top;
-  }
-
-  async function loadPopularChips() {
-    try {
-      const raw = await AsyncStorage.getItem(POPULAR_STORAGE_KEY);
-      const counts: PopularCounts = raw ? JSON.parse(raw) : {};
-      setPopularChips(rankPopularChips(counts));
-    } catch {
-      // Storage read failed — keep the default chips already in state
-    }
-  }
-
-  async function recordSearchUsage(type: "tag" | "text", value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-
-    try {
-      const raw = await AsyncStorage.getItem(POPULAR_STORAGE_KEY);
-      const counts: PopularCounts = raw ? JSON.parse(raw) : {};
-      const key = `${type}:${trimmed.toLowerCase()}`;
-
-      counts[key] = {
-        type,
-        value: trimmed,
-        count: (counts[key]?.count ?? 0) + 1,
-      };
-
-      await AsyncStorage.setItem(POPULAR_STORAGE_KEY, JSON.stringify(counts));
-      setPopularChips(rankPopularChips(counts));
-    } catch {
-      // Best-effort — if storage fails, the chips just stay as they were
-    }
-  }
-
   // ---------- Shared search logic ----------
 
   const filteredPlants = useMemo(() => {
@@ -177,10 +128,7 @@ export default function SearchScreen() {
     const next = activeTag === tag ? null : tag;
     setActiveTag(next);
 
-    if (next) {
-      saveRecentSearch(tag);
-      recordSearchUsage("tag", tag);
-    }
+    if (next) saveRecentSearch(tag);
   }
 
   function goToDetail(plantId: string) {
@@ -191,27 +139,24 @@ export default function SearchScreen() {
 
   function handleSubmitSearch() {
     const trimmed = query.trim();
-    if (trimmed) {
-      saveRecentSearch(trimmed);
-      recordSearchUsage("text", trimmed);
-    }
+    if (trimmed) saveRecentSearch(trimmed);
     setIsFocused(false);
   }
 
   function selectRecentSearch(term: string) {
     setQuery(term);
     saveRecentSearch(term);
-    recordSearchUsage("text", term);
     setIsFocused(false);
   }
 
-  function selectPopularChip(entry: PopularEntry) {
-    if (entry.type === "tag") {
-      toggleTag(entry.value as PlantTag);
+  // Tapping a chip in the Recent Searches row: a recent that is exactly a
+  // health tag keeps the tag-filter behaviour; everything else runs as a
+  // normal text search.
+  function pressChip(term: string) {
+    if ((DEFAULT_TAGS as string[]).includes(term)) {
+      toggleTag(term as PlantTag);
     } else {
-      setQuery(entry.value);
-      saveRecentSearch(entry.value);
-      recordSearchUsage("text", entry.value);
+      selectRecentSearch(term);
     }
   }
 
@@ -237,7 +182,7 @@ export default function SearchScreen() {
       <View className="flex-row items-center px-5 mt-4">
         <Pressable onPress={() => router.back()} className="mr-4">
           <Image
-            source={require("@/assets/images/icons/Chevron_left.png")}
+            source={require("@/assets/images/icons/arrow_left.png")}
             style={{ width: 20, height: 20 }}
             resizeMode="contain"
           />
@@ -267,7 +212,7 @@ export default function SearchScreen() {
           />
           <Pressable onPress={handleSubmitSearch} hitSlop={8}>
             <Image
-              source={require("@/assets/images/icons/Search.png")}
+              source={require("@/assets/images/icons/search.png")}
               style={{ width: 18, height: 18 }}
               resizeMode="contain"
             />
@@ -295,7 +240,11 @@ export default function SearchScreen() {
                 className="flex-row items-center justify-between py-3"
               >
                 <View className="flex-row items-center flex-1 pr-3">
-                  <Text style={{ fontSize: 15, marginRight: 10, color: "#9ca3af" }}>🕐</Text>
+                  <Image
+                    source={require("@/assets/images/icons/Clock.png")}
+                    style={{ width: 15, height: 15, marginRight: 10 }}
+                    resizeMode="contain"
+                  />
                   <Text
                     className="text-sm flex-1"
                     style={{ color: "#1B4332" }}
@@ -316,39 +265,49 @@ export default function SearchScreen() {
           <>
             {!isSearching ? (
               <>
-                {/* Default browsing state */}
-                <Text className="font-bold text-base mt-6 mb-2" style={{ color: "#1B4332" }}>
-                  Popular Searches
-                </Text>
+                {/* Default browsing state. The "clear" action stays even
+                    when there's nothing to clear — the chips area below is
+                    simply empty for a user with no recent searches. */}
+                <View className="flex-row justify-between items-center mt-6 mb-2">
+                  <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                    Recent Searches
+                  </Text>
+                  <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
+                    <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                      clear
+                    </Text>
+                  </Pressable>
+                </View>
                 <View className="flex-row flex-wrap">
-                  {popularChips.map((entry) => {
-                    const active = entry.type === "tag" && activeTag === entry.value;
+                  {recentSearches.map((term) => {
+                    const active = activeTag === term;
                     return (
                       <Pressable
-                        key={`${entry.type}:${entry.value}`}
-                        onPress={() => selectPopularChip(entry)}
+                        key={term}
+                        onPress={() => pressChip(term)}
                         className="rounded-full px-4 py-2 mr-2 mb-2 border"
                         style={{
                           borderColor: "#1B4332",
-                          backgroundColor: active ? "#1B4332" : "transparent",
+                          backgroundColor: active ? "#1B4332" : "#FFFFFF",
                         }}
                       >
                         <Text
                           className="text-xs font-semibold"
                           style={{ color: active ? "#FFFFFF" : "#1B4332" }}
                         >
-                          {entry.value}
+                          {term}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
+                {/* Recommendations — 5 plants, reshuffled on every visit */}
                 <Text className="font-bold text-base mt-4 mb-2" style={{ color: "#1B4332" }}>
-                  Popular medicinal plants
+                  Recommendations
                 </Text>
 
-                {PLANTS.map((plant) => (
+                {recommended.map((plant) => (
                   <Pressable
                     key={plant.id}
                     onPress={() => goToDetail(plant.id)}

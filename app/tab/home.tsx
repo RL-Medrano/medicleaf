@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
@@ -14,6 +15,13 @@ import { getAuthState } from "@/utils/guest";
 import { GuestPrompt } from "@/components/GuestPrompt";
 import { getRandomPlants, Plant } from "@/data/plants";
 import { CachedPlantImage } from "@/components/CachedPlantImage";
+import TutorialGuide from "@/components/TutorialGuide";
+import { Skel, SKELETON_COLOR, useSkeletonPulse } from "@/components/Skel";
+import {
+  getTutorialState,
+  setTutorialCollapsed,
+  type TutorialState,
+} from "@/utils/tutorial";
 
 type RecentScan = {
   id: string;
@@ -39,11 +47,23 @@ export default function HomeScreen() {
   const [recentScan, setRecentScan] = useState<RecentScan | null>(null);
   const [recentPost, setRecentPost] = useState<RecentPost | null>(null);
 
+  // First-run Tutorial Guide panel. Null for guests and for accounts that
+  // were not just created (they never got enrolled — see utils/tutorial.ts).
+  const [tutorial, setTutorial] = useState<TutorialState | null>(null);
+
   // 3 random plants, re-shuffled every time this screen gains focus (app
   // open, or navigating back here) — see useFocusEffect below. The ref
   // tracks the last shown set so the next shuffle avoids repeating it.
   const [featuredPlants, setFeaturedPlants] = useState<Plant[]>(() => getRandomPlants(3));
   const previousFeaturedIds = useRef<string[]>(featuredPlants.map((plant) => plant.id));
+
+  // True until the first loadHomeData() settles. While it's on, the header
+  // name and the two account cards render as green skeleton blocks — which
+  // is exactly what a slow (or dead) connection looks like on this screen.
+  const [loading, setLoading] = useState(true);
+
+  // Gentle pulse on those blocks so "still loading" reads clearly.
+  const skeletonPulse = useSkeletonPulse(loading);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,53 +75,73 @@ export default function HomeScreen() {
   );
 
   async function loadHomeData() {
-    // getAuthState() reads the session stored on the phone (works offline)
-    // and also recognises a local guest, who has no session at all.
-    const { user, isGuest: guest } = await getAuthState();
-    setIsGuest(guest);
+    try {
+      // getAuthState() reads the session stored on the phone (works offline)
+      // and also recognises a local guest, who has no session at all.
+      const { user, isGuest: guest } = await getAuthState();
+      setIsGuest(guest);
 
-    // Guests have nothing else to load — plant library is local now.
-    if (guest || !user) return;
+      // Tutorial guide state — reloaded on every focus so a step completed
+      // elsewhere (scan, library, history, messages, posts) shows up as soon
+      // as the user comes back here.
+      setTutorial(await getTutorialState(user?.id ?? null));
 
-    // These three queries don't depend on each other, so run them
-    // concurrently instead of one after another — cuts total wait time
-    // down to roughly the slowest single query instead of the sum of all three.
-    const [profileResult, scanResult, postResult] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("scans")
-        .select("id, name, accuracy, date, time, image_url")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("posts")
-        .select("id, name, caption, image_url, location_name, profiles(username)")
-        .neq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+      // Guests have nothing else to load — plant library is local now.
+      if (guest || !user) return;
 
-    // Failed queries used to look the same as "nothing to show". Log them
-    // so a broken query (e.g. a missing foreign key for profiles(username))
-    // is visible instead of silently hiding a card.
-    if (profileResult.error) console.error("[home] profile load failed:", profileResult.error.message);
-    if (scanResult.error) console.error("[home] scan load failed:", scanResult.error.message);
-    if (postResult.error) console.error("[home] post load failed:", postResult.error.message);
+      // These three queries don't depend on each other, so run them
+      // concurrently instead of one after another — cuts total wait time
+      // down to roughly the slowest single query instead of the sum of all three.
+      const [profileResult, scanResult, postResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("scans")
+          .select("id, name, accuracy, date, time, image_url")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("posts")
+          .select("id, name, caption, image_url, location_name, profiles(username)")
+          .neq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-    if (profileResult.data) {
-      setDisplayName(profileResult.data.username ?? "there");
+      // Failed queries used to look the same as "nothing to show". Log them
+      // so a broken query (e.g. a missing foreign key for profiles(username))
+      // is visible instead of silently hiding a card.
+      if (profileResult.error) console.error("[home] profile load failed:", profileResult.error.message);
+      if (scanResult.error) console.error("[home] scan load failed:", scanResult.error.message);
+      if (postResult.error) console.error("[home] post load failed:", postResult.error.message);
+
+      if (profileResult.data) {
+        setDisplayName(profileResult.data.username ?? "there");
+      }
+
+      if (scanResult.data) setRecentScan(scanResult.data);
+
+      if (postResult.data) setRecentPost(postResult.data as unknown as RecentPost);
+    } finally {
+      // The skeleton blocks show until this FIRST load settles — content
+      // arrived, there's nothing to show, or the queries failed on a bad
+      // connection. Runs on every focus, but only matters the first time.
+      setLoading(false);
     }
+  }
 
-    if (scanResult.data) setRecentScan(scanResult.data);
-
-    if (postResult.data) setRecentPost(postResult.data as unknown as RecentPost);
+  // Collapsing/expanding the guide — optimistic in state, best-effort persist.
+  function handleTutorialToggle() {
+    if (!tutorial) return;
+    const collapsed = !tutorial.collapsed;
+    setTutorial({ ...tutorial, collapsed });
+    setTutorialCollapsed(collapsed);
   }
 
   function formatDate(dateValue: string) {
@@ -141,9 +181,24 @@ export default function HomeScreen() {
             <Text className="text-sm" style={{ color: "#374151" }}>
               Welcome back,
             </Text>
-            <Text className="text-2xl font-bold" style={{ color: "#1B4332" }}>
-              {isGuest ? "User" : `${displayName}!`}
-            </Text>
+            {loading ? (
+              // Skeleton: the name pill from the mockup.
+              <Animated.View style={{ opacity: skeletonPulse }}>
+                <View
+                  style={{
+                    width: 170,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: SKELETON_COLOR,
+                    marginTop: 4,
+                  }}
+                />
+              </Animated.View>
+            ) : (
+              <Text className="text-2xl font-bold" style={{ color: "#1B4332" }}>
+                {isGuest ? "User" : `${displayName}!`}
+              </Text>
+            )}
           </View>
 
           <Image
@@ -152,6 +207,14 @@ export default function HomeScreen() {
             resizeMode="contain"
           />
         </View>
+
+        {/* First-run Tutorial Guide — only enrolled (brand-new) accounts see
+            it, and it retires itself once all 5 steps are done. */}
+        {!isGuest && tutorial?.enabled && (
+          <View className="mt-5">
+            <TutorialGuide state={tutorial} onToggle={handleTutorialToggle} />
+          </View>
+        )}
 
         <View
           className="rounded-2xl p-5 mt-5 flex-row items-center"
@@ -183,20 +246,41 @@ export default function HomeScreen() {
         </View>
 
         <View className="mt-6">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
-              Recent Scan
-            </Text>
-            {!isGuest && (
-              <Pressable onPress={() => router.push("/tab/history")}>
-                <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
-                  View all
-                </Text>
-              </Pressable>
-            )}
-          </View>
-
-          {isGuest ? (
+          {loading ? (
+            <Animated.View style={{ opacity: skeletonPulse }}>
+              <View
+                className="rounded-2xl p-4 flex-row items-center"
+                style={{ backgroundColor: "#FFFFFF" }}
+              >
+                <Skel w={88} h={108} style={{ borderRadius: 16 }} />
+                <View className="flex-1 ml-3">
+                  {/* "Recent Scan" + "View all" */}
+                  <View className="flex-row justify-between items-center">
+                    <Skel w={96} h={14} />
+                    <Skel w={44} h={14} />
+                  </View>
+                  {/* accuracy pill + plant name */}
+                  <View className="flex-row items-center mt-2.5">
+                    <Skel w={44} h={14} />
+                    <Skel w={72} h={14} style={{ marginLeft: 8 }} />
+                  </View>
+                  {/* plant name */}
+                  <Skel w="72%" h={16} style={{ marginTop: 8 }} />
+                  {/* clock + date */}
+                  <View className="flex-row items-center mt-2.5">
+                    <Skel w={14} h={14} />
+                    <Skel w="55%" h={12} style={{ marginLeft: 6 }} />
+                  </View>
+                </View>
+                {/* chevron */}
+                <Skel
+                  w={24}
+                  h={24}
+                  style={{ marginLeft: 6, alignSelf: "flex-end", marginBottom: 2 }}
+                />
+              </View>
+            </Animated.View>
+          ) : isGuest ? (
             <GuestPrompt message="Create or Log in your account to see recent scan" />
           ) : recentScan ? (
             <Pressable
@@ -206,15 +290,30 @@ export default function HomeScreen() {
                   params: { scanId: recentScan.id },
                 })
               }
-              className="rounded-2xl p-3 flex-row items-center"
+              className="rounded-2xl p-4 flex-row items-center"
               style={{ backgroundColor: "#FFFFFF" }}
             >
               <Image
                 source={{ uri: recentScan.image_url }}
-                style={{ width: 64, height: 64, borderRadius: 12 }}
+                style={{ width: 88, height: 108, borderRadius: 16 }}
               />
               <View className="flex-1 ml-3">
-                <View className="flex-row items-center">
+                {/* Heading row lives inside the card, as in the mockup. */}
+                <View className="flex-row justify-between items-center">
+                  <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                    Recent Scan
+                  </Text>
+                  <Pressable
+                    onPress={() => router.push("/tab/history")}
+                    hitSlop={8}
+                  >
+                    <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                      View all
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View className="flex-row items-center mt-2">
                   <View
                     className="rounded-full px-2 py-0.5"
                     style={{ backgroundColor: "#D8F3DC" }}
@@ -223,20 +322,54 @@ export default function HomeScreen() {
                       {recentScan.accuracy}%
                     </Text>
                   </View>
+                  <Text className="text-sm ml-2" style={{ color: "#6b7280" }}>
+                    {recentScan.name}
+                  </Text>
                 </View>
-                <Text className="font-bold mt-1" style={{ color: "#1B4332" }}>
+
+                <Text className="font-bold text-base mt-1.5" style={{ color: "#1B4332" }}>
                   {recentScan.name}
                 </Text>
-                <Text className="text-xs mt-1" style={{ color: "#6b7280" }}>
-                  🕐 {formatDate(recentScan.date)} • {formatTime(recentScan.time)}
-                </Text>
+
+                <View className="flex-row items-center mt-1.5">
+                  <Image
+                    source={require("@/assets/images/icons/Clock.png")}
+                    style={{ width: 16, height: 16 }}
+                    resizeMode="contain"
+                  />
+                  <Text className="text-xs ml-1.5" style={{ color: "#6b7280" }}>
+                    {formatDate(recentScan.date)} • {formatTime(recentScan.time)}
+                  </Text>
+                </View>
               </View>
-              <Text style={{ fontSize: 18, color: "#9ca3af" }}>›</Text>
+              <Text
+                style={{
+                  fontSize: 22,
+                  color: "#9ca3af",
+                  marginLeft: 4,
+                  alignSelf: "flex-end",
+                  marginBottom: 2,
+                }}
+              >
+                ›
+              </Text>
             </Pressable>
-          ) : null}
+          ) : (
+            // Signed in, but nothing scanned yet (mockups A and B).
+            <View
+              className="rounded-2xl py-8 items-center"
+              style={{ backgroundColor: "#FFFFFF" }}
+            >
+              <Text className="font-bold" style={{ color: "#1B4332" }}>
+                No Recent Scan
+              </Text>
+            </View>
+          )}
         </View>
 
-        <View className="mt-6">
+        {/* White panel behind the whole section — mockup shows the heading
+            and the tiles sitting on a card, not straight on the page. */}
+        <View className="mt-6 rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF" }}>
           <View className="flex-row justify-between items-center mb-2">
             <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
               Search Medicinal Plants
@@ -255,12 +388,21 @@ export default function HomeScreen() {
                 onPress={() =>
                   router.push({ pathname: "/plantdetail", params: { slug: plant.id } })
                 }
-                style={{ width: "31%" }}
+                style={{
+                  width: "31%",
+                  // Tiles sit on the white panel, so they need their own edge
+                  // to stay readable as separate cards (as in the mockup).
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  padding: 6,
+                }}
               >
                 <CachedPlantImage
                   plantId={plant.id}
                   remoteUrl={plant.imageUrl}
-                  style={{ width: "100%", height: 90, borderRadius: 12 }}
+                  style={{ width: "100%", height: 90, borderRadius: 10 }}
                 />
                 <Text
                   className="text-xs font-bold text-center mt-1"
@@ -282,34 +424,85 @@ export default function HomeScreen() {
         </View>
 
         <View className="mt-6 mb-6">
-          {isGuest ? (
+          {loading ? (
+            <Animated.View style={{ opacity: skeletonPulse }}>
+              <View className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF" }}>
+                <View className="flex-row justify-between items-center">
+                  <Skel w={110} h={14} />
+                  <Skel w={22} h={22} />
+                </View>
+                <View className="flex-row items-center mt-3">
+                  <Skel w={86} h={86} style={{ borderRadius: 16 }} />
+                  <View className="ml-3 flex-1">
+                    <Skel w="72%" h={16} />
+                    <Skel w="88%" h={12} style={{ marginTop: 8 }} />
+                    <View className="flex-row items-center mt-2.5">
+                      <Skel w={12} h={12} />
+                      <Skel w="60%" h={12} style={{ marginLeft: 6 }} />
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          ) : isGuest ? (
             <GuestPrompt message="Create or Log in your account to see others posts" />
           ) : recentPost ? (
             <Pressable
               onPress={() => router.push("/tab/community")}
-              className="rounded-2xl p-4 flex-row items-center"
-              style={{ backgroundColor: "#B7E4C7" }}
+              className="rounded-2xl p-4"
+              style={{ backgroundColor: "#FFFFFF" }}
             >
-              <Image
-                source={{ uri: recentPost.image_url }}
-                style={{ width: 56, height: 56, borderRadius: 12 }}
-              />
-              <View className="ml-3 flex-1">
-                <Text className="font-bold" style={{ color: "#1B4332" }}>
-                  {recentPost.profiles?.username ?? "Someone"}
-                </Text>
-                <Text className="text-sm" style={{ color: "#1B4332" }}>
-                  {recentPost.caption ?? `Found ${recentPost.name}!`}
-                </Text>
-                {recentPost.location_name && (
-                  <Text className="text-xs" style={{ color: "#374151" }}>
-                    📍 {recentPost.location_name}
+              {/* Heading spans the card, as in the mockup. */}
+              <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                Recent Post
+              </Text>
+              <View className="flex-row items-center mt-2">
+                <Image
+                  source={{ uri: recentPost.image_url }}
+                  style={{ width: 86, height: 86, borderRadius: 16 }}
+                />
+                <View className="ml-3 flex-1">
+                  <Text
+                    className="font-bold text-base"
+                    style={{ color: "#1A1A1A" }}
+                    numberOfLines={1}
+                  >
+                    {recentPost.profiles?.username ?? "Someone"}
                   </Text>
-                )}
+                  <Text
+                    className="text-sm mt-1"
+                    style={{ color: "#4b5563" }}
+                    numberOfLines={1}
+                  >
+                    {recentPost.caption ?? `Found ${recentPost.name}!`}
+                  </Text>
+                  {recentPost.location_name && (
+                    <View className="flex-row items-center mt-1.5">
+                      <Image
+                        source={require("@/assets/images/icons/pin.png")}
+                        style={{ width: 13, height: 13 }}
+                        resizeMode="contain"
+                      />
+                      <Text className="text-xs ml-1" style={{ color: "#6b7280" }}>
+                        {recentPost.location_name}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 20, color: "#9ca3af", marginLeft: 4 }}>›</Text>
               </View>
-              <Text style={{ fontSize: 18, color: "#1B4332" }}>›</Text>
             </Pressable>
-          ) : null}
+          ) : (
+            // Signed in, but no other user has posted yet (mockup A).
+            <View
+              className="rounded-2xl py-8 items-center"
+              style={{ backgroundColor: "#FFFFFF" }}
+            >
+              <Text className="font-bold" style={{ color: "#1B4332" }}>
+                No Recent Post
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
+import { enableTutorial } from "@/utils/tutorial";
 
 export default function SetUsernameScreen() {
   const [username, setUsername] = useState("");
@@ -77,6 +78,13 @@ export default function SetUsernameScreen() {
         Alert.alert("Couldn't save", "Your profile could not be updated. Please try again.");
         return;
       }
+
+      // Reaching this screen means the account was just created through
+      // Google (email sign-ups never see it — the DB trigger already had
+      // everything from the signup form). Enroll it in the first-run
+      // Tutorial Guide before heading to Home. Idempotent: if email sign-up
+      // already enrolled this id, progress is left untouched.
+      await enableTutorial(user.id);
 
       router.replace("/tab/home");
     } catch (err) {

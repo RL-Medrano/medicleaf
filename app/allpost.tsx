@@ -131,9 +131,11 @@ export default function AllPostsScreen() {
 
       <View className="flex-row items-center px-5 py-4">
         <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text className="text-2xl" style={{ color: "#1B4332" }}>
-            ←
-          </Text>
+          <Image
+            source={require("@/assets/images/icons/arrow_left.png")}
+            style={{ width: 24, height: 24 }}
+            resizeMode="contain"
+          />
         </Pressable>
         <Text
           className="flex-1 text-xl font-bold text-center"

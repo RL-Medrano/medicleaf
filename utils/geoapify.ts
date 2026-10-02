@@ -21,6 +21,18 @@ export type ReverseGeocodeResult = {
   country: string | null;
 };
 
+/** Fetches a reverse-geocode URL and returns its first result (or null). */
+async function fetchFirstResult(url: string): Promise<any | null> {
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.message ?? "Geoapify reverse geocode failed");
+  }
+
+  return data?.results?.[0] ?? null;
+}
+
 /**
  * Converts a lat/lng pin into a readable location string, e.g.
  * "Lipa City, Batangas". Call this ONCE when the pin is placed/confirmed
@@ -35,16 +47,23 @@ export async function reverseGeocode(
     throw new Error("Geoapify is not configured. Check your .env file.");
   }
 
-  const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&format=json&apiKey=${GEOAPIFY_API_KEY}`;
+  const base =
+    `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}` +
+    `&format=json&apiKey=${GEOAPIFY_API_KEY}`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  // `type=city` asks Geoapify for the city/municipality ADMIN area the
+  // coordinates fall inside. Without it Geoapify matches the nearest
+  // street/POI and fills `city`/`county` from that POI's own address tags
+  // (addr:city), which is often a neighbouring city near city limits — a
+  // pin in Brgy. San Felipe, Padre Garcia was reported as "Lipa, Batangas".
+  let result = await fetchFirstResult(`${base}&type=city`);
 
-  if (!response.ok) {
-    throw new Error(data?.message ?? "Geoapify reverse geocode failed");
+  if (!result?.city && !result?.county) {
+    // The city-level lookup didn't yield a usable locality (open water,
+    // unincorporated area, ...) — try a normal nearest-address reverse
+    // lookup, keeping the city-level result if that one is empty too.
+    result = (await fetchFirstResult(base)) ?? result;
   }
-
-  const result = data?.results?.[0];
 
   if (!result) {
     return { formatted: "Unknown location", city: null, state: null, country: null };

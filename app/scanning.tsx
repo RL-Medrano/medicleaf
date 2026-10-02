@@ -6,8 +6,8 @@ import { classifyPlantImage } from "@/utils/plantClassifier";
 import RingLoader from "@/components/RingLoader";
 
 // TODO: change these paths to wherever your icon images are
-const checkIcon = require("@/assets/images/check icon.png");
-const unknownIcon = require("@/assets/images/warning.png");
+const checkIcon = require("@/assets/images/icons/check icon.png");
+const unknownIcon = require("@/assets/images/icons/warning icon.png");
 
 type Status = "checking" | "identified" | "unknown";
 
@@ -31,6 +31,22 @@ function IconSlot({ children }: { children: React.ReactNode }) {
 export default function ScanningScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const [status, setStatus] = useState<Status>("checking");
+
+  // Title follows the state in the Figma design: scanning → successfully
+  // scanned → failed to detect.
+  const title =
+    status === "checking"
+      ? "Scanning Medicinal\nPlant Leaf...."
+      : status === "identified"
+      ? "Successfully scanned"
+      : "Failed to Detect";
+
+  const statusLabel =
+    status === "checking"
+      ? "Checking Plant"
+      : status === "identified"
+      ? "Plant Identified"
+      : "Unknown Plant";
 
   // Tracks whether the user is still on this screen. Classification runs
   // async and can't be truly "cancelled" mid-flight, but this stops it
@@ -107,9 +123,11 @@ export default function ScanningScreen() {
       <View className="px-5">
         <View className="flex-row items-center mt-4">
           <Pressable onPress={handleRetry} hitSlop={12}>
-            <Text className="text-2xl" style={{ color: "#1B4332" }}>
-              ←
-            </Text>
+            <Image
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 24, height: 24 }}
+              resizeMode="contain"
+            />
           </Pressable>
         </View>
 
@@ -117,7 +135,7 @@ export default function ScanningScreen() {
           className="text-2xl font-bold text-center mt-2"
           style={{ color: "#1B4332" }}
         >
-          Scanning Medicinal{"\n"}Plant Leaf....
+          {title}
         </Text>
 
         {imageUri && (
@@ -133,7 +151,9 @@ export default function ScanningScreen() {
           </View>
         )}
 
-        {/* Checking Plant */}
+        {/* One status card for the current state only — the design shows
+            Checking Plant / Plant Identified / Unknown Plant as separate
+            screens, not three stacked rows. */}
         <View
           className="rounded-2xl p-4 mt-5 flex-row items-center"
           style={{ backgroundColor: "#FFFFFF" }}
@@ -143,68 +163,22 @@ export default function ScanningScreen() {
               <RingLoader size={24} strokeWidth={3} />
             ) : (
               <Image
-                source={checkIcon}
+                source={status === "identified" ? checkIcon : unknownIcon}
                 style={{ width: 24, height: 24 }}
                 resizeMode="contain"
               />
-            )}
-          </IconSlot>
-          <Text className="font-semibold" style={{ color: "#1B4332" }}>
-            Checking Plant
-          </Text>
-        </View>
-
-        {/* Plant Identified */}
-        <View
-          className="rounded-2xl p-4 mt-3 flex-row items-center"
-          style={{
-            backgroundColor: status === "identified" ? "#FFFFFF" : "#F3F4F6",
-            opacity: status === "checking" ? 0.5 : 1,
-          }}
-        >
-          <IconSlot>
-            {status === "identified" ? (
-              <Image
-                source={checkIcon}
-                style={{ width: 24, height: 24 }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Text className="text-xl">○</Text>
-            )}
-          </IconSlot>
-          <Text className="font-semibold" style={{ color: "#1B4332" }}>
-            Plant Identified
-          </Text>
-        </View>
-
-        {/* Unknown Plant */}
-        <View
-          className="rounded-2xl p-4 mt-3 flex-row items-center"
-          style={{
-            backgroundColor: status === "unknown" ? "#FFFFFF" : "#F3F4F6",
-            opacity: status === "checking" ? 0.5 : 1,
-          }}
-        >
-          <IconSlot>
-            {status === "unknown" ? (
-              <Image
-                source={unknownIcon}
-                style={{ width: 24, height: 24 }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Text className="text-xl">○</Text>
             )}
           </IconSlot>
           <Text
             className="font-semibold"
             style={{ color: status === "unknown" ? "#991B1B" : "#1B4332" }}
           >
-            Unknown Plant
+            {statusLabel}
           </Text>
         </View>
 
+        {/* Failed to detect — keep the way back to scan.tsx so the user can
+            take another photo or upload a different image. */}
         {status === "unknown" && (
           <Pressable
             onPress={handleRetry}

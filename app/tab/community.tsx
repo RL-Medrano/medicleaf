@@ -12,10 +12,11 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
+import { markTutorialStep } from "@/utils/tutorial";
 import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
 import { GuestPrompt } from "@/components/GuestPrompt";
 
@@ -30,12 +31,13 @@ type Post = {
   longitude: number | null;
   created_at: string;
   user_id: string;
-  profiles: { username: string } | null;
+  profiles: { username: string; avatar_url: string | null } | null;
 };
 
 type Conversation = {
   partnerId: string;
   partnerUsername: string;
+  avatarUrl: string | null;
   lastMessage: string;
   lastMessageAt: string;
   unreadCount: number;
@@ -45,11 +47,42 @@ type Tab = "feed" | "messages";
 
 const FEED_SEEN_KEY = "community_feed_last_seen";
 
-// Change this path to your real pin icon. It's relative to this file:
-// from app/tab/community.tsx, "../../assets/..." reaches the project root.
+// Pin icon lives in assets/images/icons/.
+// It's relative to this file: from app/tab/community.tsx,
+// "../../assets/..." reaches the project root.
 const ICONS = {
-  pin: require("../../assets/icons/pin.png"),
+  pin: require("../../assets/images/icons/pin.png"),
+  search: require("../../assets/images/icons/search.png"),
+  placeholder: require("../../assets/images/icons/place_holder.png"),
+  send: require("../../assets/images/icons/send icon.png"),
 };
+
+// Avatar shown when the user has no profile picture (mockup: place_holder.png).
+function Avatar({
+  uri,
+  size,
+}: {
+  uri: string | null | undefined;
+  size: number;
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        overflow: "hidden",
+        backgroundColor: "#E9E9E9",
+      }}
+    >
+      <Image
+        source={uri ? { uri } : ICONS.placeholder}
+        style={{ width: size, height: size }}
+        resizeMode={uri ? "cover" : "contain"}
+      />
+    </View>
+  );
+}
 
 function TabBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -72,6 +105,9 @@ function TabBadge({ count }: { count: number }) {
 
 export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("feed");
+  // The tutorial's "Message" step lands here with ?tab=messages so the Go
+  // button opens the right tab directly instead of the News Feed.
+  const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
   const [posts, setPosts] = useState<Post[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,9 +118,20 @@ export default function CommunityScreen() {
   const [newPosts, setNewPosts] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  // Deep link with ?tab=messages (used by the tutorial's "Message" Go
+  // button) opens the Messages tab directly instead of the News Feed.
+  useEffect(() => {
+    if (requestedTab === "messages") setActiveTab("messages");
+  }, [requestedTab]);
+
   useFocusEffect(
     useCallback(() => {
       checkGuestThenLoad();
+
+      // Tutorial progress: the News Feed completes "View Posts", the
+      // Messages tab completes "Message". No-op for guests and accounts
+      // the guide isn't enrolled in.
+      markTutorialStep(activeTab === "feed" ? "viewposts" : "message");
     }, [activeTab])
   );
 
@@ -121,15 +168,23 @@ export default function CommunityScreen() {
   // Live badge updates via Supabase Realtime
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    // Set by cleanup before the async setup below has resolved — without it
+    // we'd subscribe after unmount and never remove that channel.
+    let cancelled = false;
 
     (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user || user.is_anonymous) return;
+      if (cancelled || !user || user.is_anonymous) return;
 
+      // Fresh topic per subscription: supabase.channel(name) hands back the
+      // channel still registered under that topic, and attaching
+      // postgres_changes callbacks to one that is joining/joined throws
+      // "cannot add ... callbacks after subscribe()". removeChannel() only
+      // completes asynchronously, so a quick tab switch can outrun it.
       channel = supabase
-        .channel("community-badges")
+        .channel(`community-badges-${Math.random().toString(36).slice(2, 10)}`)
         .on(
           "postgres_changes",
           {
@@ -149,6 +204,7 @@ export default function CommunityScreen() {
     })();
 
     return () => {
+      cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
   }, [activeTab]);
@@ -203,7 +259,7 @@ export default function CommunityScreen() {
     let query = supabase
       .from("posts")
       .select(
-        "id, name, plant_slug, caption, image_url, location_name, latitude, longitude, created_at, user_id, profiles(username)"
+        "id, name, plant_slug, caption, image_url, location_name, latitude, longitude, created_at, user_id, profiles(username, avatar_url)"
       )
       .order("created_at", { ascending: false });
 
@@ -288,18 +344,19 @@ export default function CommunityScreen() {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, username")
+      .select("id, username, avatar_url")
       .in("id", partnerIds);
 
-    const usernameById = new Map(
-      (profiles ?? []).map((p) => [p.id, p.username])
+    const profileById = new Map(
+      (profiles ?? []).map((p) => [p.id, p])
     );
 
     const list: Conversation[] = partnerIds.map((partnerId) => {
       const info = seen.get(partnerId)!;
       return {
         partnerId,
-        partnerUsername: usernameById.get(partnerId) ?? "User",
+        partnerUsername: profileById.get(partnerId)?.username ?? "User",
+        avatarUrl: profileById.get(partnerId)?.avatar_url ?? null,
         lastMessage: info.lastMessage,
         lastMessageAt: info.lastMessageAt,
         unreadCount: info.unreadCount,
@@ -418,15 +475,10 @@ export default function CommunityScreen() {
         className="rounded-2xl p-4 mb-3 flex-row items-center"
         style={{ backgroundColor: "#FFFFFF" }}
       >
-        <View
-          className="rounded-full items-center justify-center"
-          style={{ width: 44, height: 44, backgroundColor: "#D8F3DC" }}
-        >
-          <Text style={{ color: "#1B4332" }}>👤</Text>
-        </View>
+        <Avatar uri={item.avatarUrl} size={44} />
 
         <View className="ml-3 flex-1">
-          <Text className="font-bold" style={{ color: "#1B4332" }}>
+          <Text className="font-bold" style={{ color: "#1A1A1A" }}>
             {item.partnerUsername}
           </Text>
           <Text
@@ -441,7 +493,7 @@ export default function CommunityScreen() {
         </View>
 
         <Text className="text-xs" style={{ color: "#6b7280" }}>
-          {time}
+          {time.toLowerCase()}
         </Text>
       </Pressable>
     );
@@ -453,26 +505,25 @@ export default function CommunityScreen() {
     return (
       <View
         className="rounded-2xl p-4 mb-4"
-        style={{ backgroundColor: "#FFFFFF" }}
+        style={{
+          backgroundColor: "#FFFFFF",
+          borderWidth: 1,
+          borderColor: "#F0F0F0",
+        }}
       >
         <View className="flex-row items-center">
-          <View
-            className="rounded-full items-center justify-center"
-            style={{ width: 40, height: 40, backgroundColor: "#D8F3DC" }}
-          >
-            <Text style={{ color: "#1B4332" }}>👤</Text>
-          </View>
-          <View className="ml-3">
-            <Text className="font-bold" style={{ color: "#1B4332" }}>
+          <Avatar uri={item.profiles?.avatar_url} size={64} />
+          <View className="ml-3 flex-1">
+            <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 17 }}>
               {item.profiles?.username ?? "Someone"}
             </Text>
-            <Text className="text-xs" style={{ color: "#6b7280" }}>
+            <Text style={{ color: "#6b7280", fontSize: 13 }}>
               Date: {dateStr}
             </Text>
-            <Text className="text-xs" style={{ color: "#6b7280" }}>
-              Time: {timeStr}
+            <Text style={{ color: "#6b7280", fontSize: 13 }}>
+              Time: {timeStr.toLowerCase()}
             </Text>
-            <Text className="text-xs" style={{ color: "#6b7280" }}>
+            <Text style={{ color: "#6b7280", fontSize: 13 }}>
               {item.name}
               {item.plant_slug &&
                 getPlantDetailsBySlug(item.plant_slug)?.scientific_name &&
@@ -481,7 +532,7 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        <Text className="mt-3" style={{ color: "#1B4332" }}>
+        <Text className="mt-3" style={{ color: "#1A1A1A", fontSize: 15 }}>
           {item.caption ?? `Found ${item.name}!`}
         </Text>
 
@@ -497,11 +548,20 @@ export default function CommunityScreen() {
           {item.user_id !== currentUserId ? (
             <Pressable
               onPress={() => handleSendMessage(item)}
-              className="rounded-full py-2 px-4 flex-row items-center"
-              style={{ backgroundColor: "#3B82F6" }}
+              className="rounded-full flex-row items-center"
+              style={{
+                backgroundColor: "#3B82F6",
+                paddingVertical: 9,
+                paddingHorizontal: 16,
+              }}
             >
-              <Text className="text-white font-semibold text-sm">
-                ➤ Send Message
+              <Image
+                source={ICONS.send}
+                style={{ width: 18, height: 18, tintColor: "#FFFFFF", marginRight: 8 }}
+                resizeMode="contain"
+              />
+              <Text className="text-white font-semibold" style={{ fontSize: 15 }}>
+                Send Message
               </Text>
             </Pressable>
           ) : (
@@ -513,16 +573,12 @@ export default function CommunityScreen() {
               onPress={() => handleLocationPress(item)}
               disabled={item.latitude == null || item.longitude == null}
               hitSlop={8}
-              className="flex-row items-center"
             >
               <Image
                 source={ICONS.pin}
-                style={{ width: 16, height: 16, marginRight: 4 }}
+                style={{ width: 22, height: 22 }}
                 resizeMode="contain"
               />
-              <Text className="text-xs" style={{ color: "#6b7280" }}>
-                {item.location_name}
-              </Text>
             </Pressable>
           )}
         </View>
@@ -531,23 +587,23 @@ export default function CommunityScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFFFFF" }} edges={["top"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <Text
         className="text-xl font-bold text-center mt-4"
-        style={{ color: "#1B4332" }}
+        style={{ color: "#1A1A1A" }}
       >
         Community
       </Text>
 
       {/* Tabs */}
-      <View className="flex-row mt-4 px-5">
+      <View className="flex-row mt-4 px-5 mb-2">
         <Pressable
           onPress={() => setActiveTab("feed")}
           className="flex-1 items-center py-3"
           style={{
-            backgroundColor: activeTab === "feed" ? "#95D5B2" : "transparent",
+            backgroundColor: activeTab === "feed" ? "#A3C6B2" : "transparent",
             borderTopLeftRadius: 12,
             borderBottomLeftRadius: 12,
           }}
@@ -555,7 +611,7 @@ export default function CommunityScreen() {
           <View className="flex-row items-center">
             <Text
               className="font-semibold"
-              style={{ color: activeTab === "feed" ? "#1B4332" : "#6b7280" }}
+              style={{ color: activeTab === "feed" ? "#1A1A1A" : "#6b7280" }}
             >
               News Feed
             </Text>
@@ -567,7 +623,7 @@ export default function CommunityScreen() {
           onPress={() => setActiveTab("messages")}
           className="flex-1 items-center py-3"
           style={{
-            backgroundColor: activeTab === "messages" ? "#95D5B2" : "transparent",
+            backgroundColor: activeTab === "messages" ? "#A3C6B2" : "transparent",
             borderTopRightRadius: 12,
             borderBottomRightRadius: 12,
           }}
@@ -575,7 +631,7 @@ export default function CommunityScreen() {
           <View className="flex-row items-center">
             <Text
               className="font-semibold"
-              style={{ color: activeTab === "messages" ? "#1B4332" : "#6b7280" }}
+              style={{ color: activeTab === "messages" ? "#1A1A1A" : "#6b7280" }}
             >
               Messages
             </Text>
@@ -584,19 +640,31 @@ export default function CommunityScreen() {
         </Pressable>
       </View>
 
-      {/* Search — only shown on News Feed, hidden for guests */}
-      {activeTab === "feed" && !isGuest && (
-        <View className="px-5 mt-4">
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search medicinal plant"
-            placeholderTextColor="#9ca3af"
-            className="rounded-full px-4 py-3"
-            style={{ backgroundColor: "#FFFFFF", color: "#1B4332" }}
-          />
-        </View>
-      )}
+      {/* Content sits on the light-green background below the white header */}
+      <View className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
+        {/* Search — only shown on News Feed, hidden for guests */}
+        {activeTab === "feed" && !isGuest && (
+          <View className="px-5 mt-4">
+            <View
+              className="flex-row items-center rounded-full px-4"
+              style={{ backgroundColor: "#FFFFFF", height: 48 }}
+            >
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search medicinal plant"
+                placeholderTextColor="#9ca3af"
+                className="flex-1"
+                style={{ color: "#1B4332", padding: 0 }}
+              />
+              <Image
+                source={ICONS.search}
+                style={{ width: 32, height: 32, marginLeft: 8 }}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        )}
 
       {/* List */}
       {isGuest ? (
@@ -646,6 +714,7 @@ export default function CommunityScreen() {
           }
         />
       )}
+      </View>
     </SafeAreaView>
   );
 }

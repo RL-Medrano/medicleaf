@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,12 @@ import {
   FlatList,
   StatusBar,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Alert,
+  Modal,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/utils/supabase";
@@ -39,6 +40,14 @@ const SEND_COOLDOWN_MS = 800;
 const MESSAGE_COLUMNS =
   "id, sender_id, receiver_id, content, image_url, is_read, created_at";
 
+// "10:24 PM" — the timestamp format used in the mockup.
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function ChatScreen() {
   const { userid: partnerId, username } = useLocalSearchParams<{
     userid: string;
@@ -51,6 +60,16 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(false);
+  // Full-screen viewer for a tapped image message (sent or received) —
+  // holds the image uri while the modal is open, null when closed.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+
+  // Bubble cap in pixels. The old `maxWidth: "78%"` resolved against
+  // auto-sized parent views that themselves size from the bubble — a
+  // circular constraint that collapsed text bubbles into a sliver.
+  // A definite pixel value always resolves the same way.
+  const { width: windowWidth } = useWindowDimensions();
+  const bubbleMaxWidth = Math.round(windowWidth * 0.78);
 
   // The other person's real profile photo — shown next to their
   // messages instead of a static placeholder icon. Null until loaded,
@@ -59,13 +78,18 @@ export default function ChatScreen() {
   const [partnerAvatarUrl, setPartnerAvatarUrl] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // True only while this screen is focused. init() is async, so it can
+  // reach the realtime subscribe long after the focus cleanup has run.
+  const focusedRef = useRef(false);
   const listRef = useRef<FlatList<Message>>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
+      focusedRef.current = true;
       init();
       return () => {
+        focusedRef.current = false;
         // Leave the realtime channel when navigating away so we don't
         // keep an open socket subscription per chat ever visited.
         if (channelRef.current) {
@@ -141,14 +165,38 @@ export default function ChatScreen() {
       .eq("sender_id", otherUserId)
       .eq("receiver_id", currentUserId)
       .eq("is_read", false);
+
+    // The UPDATE above only touches rows that were still unread, but every
+    // message from them is now read by us either way — mirror that locally so
+    // the mutual-view check marks appear without a reload.
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.sender_id === otherUserId && m.receiver_id === currentUserId
+          ? { ...m, is_read: true }
+          : m
+      )
+    );
   }
 
   function subscribeToNewMessages(currentUserId: string, otherUserId: string) {
+    // init() awaits several requests before getting here — if the screen
+    // lost focus meanwhile, cleanup already ran and this subscription
+    // would be orphaned (and channelRef would never be cleared).
+    if (!focusedRef.current) return;
+
     // One channel per open chat, filtered to messages received FROM the
     // other person — outgoing messages are already added locally on send,
     // so we don't need to hear our own inserts echoed back.
+    //
+    // The random suffix matters: supabase.channel(name) returns the channel
+    // still registered under that topic, and attaching postgres_changes
+    // callbacks to one that is joining/joined throws "cannot add ...
+    // callbacks after subscribe()". removeChannel() resolves asynchronously,
+    // so leaving and re-entering a chat quickly can outrun it.
     const channel = supabase
-      .channel(`chat:${currentUserId}:${otherUserId}`)
+      .channel(
+        `chat:${currentUserId}:${otherUserId}:${Math.random().toString(36).slice(2, 10)}`
+      )
       .on(
         "postgres_changes",
         {
@@ -174,6 +222,32 @@ export default function ChatScreen() {
           setTimeout(() => {
             listRef.current?.scrollToEnd({ animated: true });
           }, 100);
+        }
+      )
+      // Read receipts: when the OTHER person marks our messages as read,
+      // their is_read flips — that UPDATE arrives here so the check marks
+      // can appear live instead of on the next visit to this chat.
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `sender_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          const updated = payload.new as Message;
+
+          // The filter only matches messages WE sent — to anyone. Ignore
+          // threads with other people.
+          if (updated.receiver_id !== otherUserId) return;
+          if (!updated.is_read) return;
+
+          setMessages((prev) =>
+            prev.some((m) => m.id === updated.id)
+              ? prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+              : prev
+          );
         }
       )
       .subscribe();
@@ -289,54 +363,108 @@ export default function ChatScreen() {
   function renderMessage({ item }: { item: Message }) {
     const isMine = item.sender_id === myId;
 
-    return (
-      <View
-        className="flex-row mb-3"
-        style={{ justifyContent: isMine ? "flex-end" : "flex-start" }}
-      >
-        {!isMine && (
-          <Image
-            source={
-              partnerAvatarUrl
-                ? { uri: partnerAvatarUrl }
-                : require("@/assets/images/icons/place_holder.png")
-            }
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 14,
-              marginRight: 8,
-              backgroundColor: "#D8F3DC",
-            }}
-            resizeMode="cover"
-          />
-        )}
+    // 78% of the screen; received messages also clear the avatar gutter.
+    const maxBubble = bubbleMaxWidth - (isMine ? 0 : 48);
 
-        <View
-          className="rounded-2xl overflow-hidden"
-          style={{
-            backgroundColor: isMine ? "#B7E4C7" : "#FFFFFF",
-            maxWidth: "75%",
-          }}
-        >
-          {item.image_url && (
+    const bubble = (
+      <View
+        className="overflow-hidden"
+        style={{
+          borderRadius: 16,
+          backgroundColor: isMine ? "#2BB24C" : "#FFFFFF",
+          maxWidth: maxBubble,
+        }}
+      >
+        {item.image_url && (
+          // Tap the image to open it full-screen.
+          <Pressable onPress={() => setViewerUri(item.image_url)}>
             <Image
               source={{ uri: item.image_url }}
               style={{ width: 200, height: 200 }}
               resizeMode="cover"
             />
-          )}
-          {item.content && (
-            <Text
-              style={{
-                color: "#1B4332",
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-              }}
-            >
-              {item.content}
+          </Pressable>
+        )}
+        {item.content && (
+          <Text
+            style={{
+              color: isMine ? "#FFFFFF" : "#1A1A1A",
+              fontSize: 15,
+              lineHeight: 21,
+              paddingHorizontal: 14,
+              paddingVertical: 11,
+            }}
+          >
+            {item.content}
+          </Text>
+        )}
+      </View>
+    );
+
+    // Read receipt: a green check after MY timestamp once the other
+    // person has opened the chat and read the message — the mockup's
+    // "10:24 PM ✓". Received messages don't carry a check.
+    const check =
+      isMine && item.is_read ? (
+        <Image
+          source={require("@/assets/images/icons/Check.png")}
+          style={{ width: 15, height: 15, tintColor: "#2BB24C" }}
+          resizeMode="contain"
+        />
+      ) : null;
+
+    if (isMine) {
+      return (
+        <View style={{ alignItems: "flex-end", marginBottom: 16 }}>
+          {bubble}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginTop: 5,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+              {formatTime(item.created_at)}
             </Text>
-          )}
+            {check}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+        <Image
+          source={
+            partnerAvatarUrl
+              ? { uri: partnerAvatarUrl }
+              : require("@/assets/images/icons/place_holder.png")
+          }
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            marginRight: 10,
+            backgroundColor: "#E5E7EB",
+          }}
+          resizeMode="cover"
+        />
+        <View>
+          {bubble}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginTop: 5,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: "#2BB24C" }}>
+              {formatTime(item.created_at)}
+            </Text>
+          </View>
         </View>
       </View>
     );
@@ -345,28 +473,54 @@ export default function ChatScreen() {
   const sendDisabled = !draft.trim() || sending || cooldown;
   const imageButtonDisabled = sending || cooldown;
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
+    <View className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
-      <View
-        className="flex-row items-center px-5 py-3"
-        style={{ backgroundColor: "#FFFFFF" }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text className="text-2xl" style={{ color: "#1B4332" }}>
-            ←
+      {/* Header */}
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#F5F5F5" }}>
+        <View className="flex-row items-center px-4 py-2.5">
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Image
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 24, height: 24 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Image
+            source={
+              partnerAvatarUrl
+                ? { uri: partnerAvatarUrl }
+                : require("@/assets/images/icons/place_holder.png")
+            }
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              marginLeft: 14,
+              backgroundColor: "#E5E7EB",
+            }}
+            resizeMode="cover"
+          />
+          <Text
+            className="font-bold ml-3"
+            style={{ fontSize: 20, color: "#1A1A1A" }}
+          >
+            {username ?? "Chat"}
           </Text>
-        </Pressable>
-        <Text className="text-lg font-bold ml-4" style={{ color: "#1B4332" }}>
-          {username ?? "Chat"}
-        </Text>
-      </View>
+        </View>
+      </SafeAreaView>
 
+      {/* behavior="padding" lifts the composer by the keyboard height; with
+          keyboardVerticalOffset at 0 the KAV's own frame (it reaches the
+          screen bottom) does the rest — the old offset of 90 made it float
+          90px above the keyboard. */}
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={90}
+        behavior="padding"
+        keyboardVerticalOffset={0}
       >
         {loading ? (
           <View className="flex-1 items-center justify-center">
@@ -378,8 +532,9 @@ export default function ChatScreen() {
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
-            className="flex-1 px-5"
+            className="flex-1 px-4"
             contentContainerStyle={{ paddingVertical: 16 }}
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() =>
               listRef.current?.scrollToEnd({ animated: false })
             }
@@ -387,20 +542,34 @@ export default function ChatScreen() {
         )}
 
         {/* Composer */}
-        <View className="px-5 pb-4">
-          <View
-            className="rounded-2xl px-4 pt-3 pb-2"
-            style={{ backgroundColor: "#FFFFFF" }}
-          >
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Aa"
-              placeholderTextColor="#9ca3af"
-              multiline
-              style={{ color: "#1B4332", minHeight: 36 }}
-            />
-            <View className="flex-row items-center justify-between mt-2">
+        <View
+          style={{
+            backgroundColor: "#FFFFFF",
+            paddingHorizontal: 14,
+            paddingTop: 10,
+            paddingBottom: 10 + insets.bottom,
+          }}
+        >
+          <View className="flex-row items-center">
+            <View
+              className="flex-1 flex-row items-center"
+              style={{
+                backgroundColor: "#EDEDED",
+                borderRadius: 999,
+                height: 48,
+                paddingLeft: 18,
+                paddingRight: 12,
+              }}
+            >
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Type a message....."
+                placeholderTextColor="#9CA3AF"
+                style={{ flex: 1, color: "#1A1A1A", fontSize: 15 }}
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
+              />
               <Pressable
                 onPress={handlePickImage}
                 disabled={imageButtonDisabled}
@@ -408,32 +577,74 @@ export default function ChatScreen() {
                 style={{ opacity: imageButtonDisabled ? 0.4 : 1 }}
               >
                 <Image
-                  source={require("@/assets/images/icons/image.png")}
-                  style={{ width: 18, height: 18 }}
+                  source={require("@/assets/images/icons/image_icon.png")}
+                  style={{ width: 24, height: 24 }}
                   resizeMode="contain"
                 />
               </Pressable>
-
-              <Pressable
-                onPress={handleSend}
-                disabled={sendDisabled}
-                className="rounded-full items-center justify-center"
-                style={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: draft.trim() && !sendDisabled ? "#1B4332" : "#d1d5db",
-                }}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={{ color: "#FFFFFF" }}>↑</Text>
-                )}
-              </Pressable>
             </View>
+
+            <Pressable
+              onPress={handleSend}
+              disabled={sendDisabled}
+              hitSlop={8}
+              style={{ marginLeft: 10, opacity: sendDisabled ? 0.5 : 1 }}
+            >
+              {sending ? (
+                <View
+                  className="items-center justify-center"
+                  style={{ width: 46, height: 46 }}
+                >
+                  <ActivityIndicator color="#2E7D5B" />
+                </View>
+              ) : (
+                <Image
+                  source={require("@/assets/images/icons/send_icon.png")}
+                  style={{ width: 46, height: 46 }}
+                  resizeMode="contain"
+                />
+              )}
+            </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      {/* Image viewer — tap any image message (sent or received) to see
+          it full-screen; tap anywhere or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28, tintColor: "#FFFFFF" }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </View>
+      </Modal>
+    </View>
   );
 }

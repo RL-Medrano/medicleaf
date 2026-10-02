@@ -21,8 +21,16 @@ export default function TabsLayout() {
 
     // Realtime — react immediately to a new message or post arriving
     // while the app is open, instead of only checking on navigation.
+    //
+    // The topic gets a fresh suffix on every mount on purpose:
+    // supabase.channel(name) returns the channel already registered under
+    // that topic, and attaching postgres_changes callbacks to a channel that
+    // is joining/joined throws "cannot add ... callbacks after subscribe()".
+    // removeChannel() only finishes asynchronously, so a remount (Strict
+    // Mode in dev, Fast Refresh) can run before the previous channel is
+    // gone. The old channel is still removed by reference in cleanup below.
     const channel = supabase
-      .channel("tab-activity-indicator")
+      .channel(`tab-activity-indicator-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
@@ -215,7 +223,7 @@ export default function TabsLayout() {
           title: "Profile",
           tabBarIcon: ({ color }) => (
             <Image
-              source={require("@/assets/images/icons/Profile2.png")}
+              source={require("@/assets/images/icons/user.png")}
               style={{ width: 24, height: 24, tintColor: color }}
             />
           ),
