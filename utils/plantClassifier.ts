@@ -26,6 +26,8 @@
 
 import { loadTensorflowModel, TensorflowModel } from "react-native-fast-tflite";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import { Asset } from "expo-asset";
+import { Image, Platform } from "react-native";
 import jpeg from "jpeg-js";
 import { Buffer } from "buffer";
 
@@ -82,12 +84,54 @@ export function getDisplayName(slug: string): string {
 // Load the model once and reuse it. If loading fails, allow a retry next time.
 let modelPromise: Promise<TensorflowModel> | null = null;
 
+/**
+ * Resolves the .tflite source that react-native-fast-tflite can actually
+ * open. Its native loader just does `new URL(uri).readBytes()`, which only
+ * understands http(s) and real file paths:
+ *
+ * - Dev: the require() resolves to an http:// Metro URL, which loads fine.
+ * - iOS release: it resolves to a file:// URL inside the app bundle, which
+ *   also loads fine.
+ * - Android release: it resolves to a BARE `res/raw` resource name (e.g.
+ *   "assets_model_medicleaf_model") with no scheme, so `new URL(...)`
+ *   throws and the model never loads. Copy it to a real cache file first
+ *   via expo-asset, whose native module reads Android resources through
+ *   the file:///android_res/ scheme, then load from that file:// URL.
+ */
+async function resolveModelSource(): Promise<number | { url: string }> {
+  if (Platform.OS !== "android" || __DEV__) {
+    return MODEL_ASSET;
+  }
+
+  const uri = Image.resolveAssetSource(MODEL_ASSET)?.uri ?? "";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(uri)) {
+    // Already a fetchable URL (http/https/file) — load it directly.
+    return MODEL_ASSET;
+  }
+  if (!uri) {
+    throw new Error(
+      "Could not resolve the .tflite model asset for the release build"
+    );
+  }
+
+  const asset = Asset.fromURI(`file:///android_res/raw/${uri}.tflite`);
+  await asset.downloadAsync();
+  if (!asset.localUri) {
+    throw new Error(
+      `Could not copy the model resource "${uri}" to a local file`
+    );
+  }
+  return { url: asset.localUri };
+}
+
 function getModel(): Promise<TensorflowModel> {
   if (!modelPromise) {
-    modelPromise = loadTensorflowModel(MODEL_ASSET, []).catch((err) => {
-      modelPromise = null;
-      throw err;
-    });
+    modelPromise = resolveModelSource()
+      .then((source) => loadTensorflowModel(source, []))
+      .catch((err) => {
+        modelPromise = null;
+        throw err;
+      });
   }
   return modelPromise;
 }
