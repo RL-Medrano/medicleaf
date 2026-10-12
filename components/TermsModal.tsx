@@ -46,7 +46,7 @@ export function TermsModal({ visible, onClose }: Props) {
 
         <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
           <Text className="text-xs mt-4" style={{ color: "#6b7280" }}>
-            Last updated: [DATE]
+            Last updated: October 13, 2026
           </Text>
 
           <Section title="1. Acceptance of Terms">
@@ -80,18 +80,39 @@ export function TermsModal({ visible, onClose }: Props) {
           </Section>
 
           <Section title="4. Account Information">
-            To use certain features (saving scans, posting to the
-            community, messaging), you must create an account. You agree
-            to provide accurate information and are responsible for
-            maintaining the confidentiality of your account credentials.
+            To use certain features (saving scan history, posting to the
+            community, the map, and messaging), you must create an account.
+            At sign-up we collect your email address, username, first name,
+            and last name — plus your birthdate and gender if you choose to
+            provide them. You may instead sign in with Google, which shares
+            your name and email with us for that purpose. You agree to
+            provide accurate information and are responsible for keeping
+            your account secure.
+            {"\n\n"}
+            As an extra sign-in step, the App asks you to create a 6-digit
+            PIN. Only a salted hash of your PIN is stored on our server —
+            the PIN itself is never stored and cannot be read by us. If you
+            tick "Remember me", your email and password are saved in your
+            device's secure storage so you are not asked for them again;
+            that saved copy lives only on your device and is removed when
+            you turn "Remember me" off or delete your account.
           </Section>
 
           <Section title="5. Location Data">
-            If you choose to share your location when posting a plant
-            sighting, that location becomes visible to other users of the
-            App on the Community Map. You may decline to share location
-            for any individual post; doing so will not affect your ability
-            to use other features.
+            Posts in the App are location-based. When you create a post,
+            the App attaches the location of the photo itself: for photos
+            you take with the camera, that is the location recorded with
+            the photo (or your location at the moment you took it); for
+            photos chosen from your gallery, the photo must already contain
+            location information — if it does not, the post cannot be
+            published. Your location permission is requested only for this
+            purpose, and the App does not track your location in the
+            background or share your live position with anyone.
+            {"\n\n"}
+            A post's location (its coordinates and a street-level address
+            derived from them) becomes visible to other users on the
+            Community feed and on the Map. The Map is view-only: it shows
+            where posts were made and never shows where you are.
           </Section>
 
           <Section title="6. User-Generated Content">
@@ -104,41 +125,58 @@ export function TermsModal({ visible, onClose }: Props) {
           </Section>
 
           <Section title="7. Data We Collect">
-            We collect: (a) account information (email, username, name);
-            (b) photos you capture or upload for plant scanning and
-            posting; (c) location data you choose to share; (d) messages
-            you send to other users; (e) basic usage data to operate and
-            improve the App.
+            We collect only what the App's features need:{"\n\n"}
+            (a) account information — email, username, first and last name,
+            and birthdate/gender if you provide them (or your Google name
+            and email if you sign in with Google);{"\n"}
+            (b) a salted hash of your sign-in PIN;{"\n"}
+            (c) plant scan photos you choose to save, with the
+            identification result, accuracy, date, and time;{"\n"}
+            (d) posts you create — photo, caption, plant name, the photo's
+            location, and timestamp;{"\n"}
+            (e) messages you send to other users, including photos you
+            attach to a chat;{"\n"}
+            (f) your recent search terms, used to show your Recent
+            Searches;{"\n"}
+            (g) your profile photo, if you add one.
+            {"\n\n"}
+            The App contains no advertising and no third-party analytics
+            or tracking SDKs.
           </Section>
 
           <Section title="8. How We Use Your Data">
             Your data is used to operate core App features: identifying
-            plants, displaying your posts and profile to other users,
-            enabling messaging, and showing your saved scan history. We do
-            not sell your personal data to third parties.
+            plants, saving your scan history, displaying your posts and
+            profile to other users, enabling messaging and the community
+            map, and keeping you signed in securely. We do not sell your
+            personal data to third parties and do not use it for
+            advertising.
           </Section>
 
           <Section title="9. Third-Party Services">
-            The App uses third-party services to operate: Supabase (account
-            and data storage), Cloudinary (image hosting), and Geoapify
-            (maps and location services). These providers process data on
-            our behalf under their own privacy and security practices.
+            The App uses third-party services to operate: Supabase
+            (accounts, database, and server functions), Cloudinary (photo
+            and image hosting), Geoapify (map tiles, converting a post's
+            coordinates into a readable address, and drawing walking routes
+            on the map), and Google Sign-In (alternative sign-in). These
+            providers process data on our behalf under their own privacy
+            and security practices.
           </Section>
 
           <Section title="10. Guest Mode">
-            You may use certain features (plant scanning, plant library)
-            without creating an account. Guest sessions are not saved
-            permanently and guest activity is not linked to a persistent
-            identity. Community and messaging features require a full
-            account.
+            You may use the plant scanner and the plant library without
+            creating an account. Guest activity stays on your device and is
+            not linked to a persistent identity. Scan history, community
+            posting, the map, and messaging require a full account.
           </Section>
 
           <Section title="11. Account Deletion">
-            You may request account deletion at any time. Deleting your
-            account will remove your profile and personal information in
-            accordance with applicable law; some content (such as posts
-            visible to other users) may be retained or anonymized as
-            described at the time of deletion.
+            You may delete your account at any time from Delete Account in
+            your profile. This permanently erases your profile information,
+            scan history, posts and your interactions with other users, and
+            app settings and preferences, and removes the credentials saved
+            by "Remember me" from your device. This action is permanent and
+            cannot be undone.
           </Section>
 
           <Section title="12. Changes to These Terms">

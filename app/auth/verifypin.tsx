@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Image, Pressable, StatusBar, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -50,6 +50,26 @@ export default function VerifyPinScreen() {
 
   function goToLogin() {
     router.replace("/auth/login");
+  }
+
+  // Back = fully cancel this login: the sign-in that got us here already
+  // created a session on this device, so merely navigating away would
+  // leave it alive — and the splash screen would send the user straight
+  // back to this gate on the next open. Sign out for real (revoked
+  // server-side when online; the local session is cleared either way),
+  // clear the local PIN-verified flag, and restart at Welcome. Same
+  // cleanup the 3-wrong-PIN path below already does.
+  async function handleCancelLogin() {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      // Offline: the server-side revoke couldn't be delivered, which is
+      // harmless — the app no longer holds the token, so nobody can be
+      // silently logged back in with it.
+      console.error("[verifypin] signOut on cancel failed:", err);
+    }
+    await clearPinVerified();
+    router.replace("/welcome");
   }
 
   async function handleVerify() {
@@ -117,8 +137,19 @@ export default function VerifyPinScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
       <View className="flex-1 px-6">
-        <Pressable onPress={goToLogin} hitSlop={12}>
-          <Text style={{ color: "#1B4332", fontSize: 16 }}>{"< Back"}</Text>
+        {/* Same back button as login/signup: the back.png icon with the
+            word kept beside it, lowered (mt-2) so it clears the status bar. */}
+        <Pressable
+          onPress={handleCancelLogin}
+          className="mt-2 self-start flex-row items-center"
+          hitSlop={12}
+        >
+          <Image
+            source={require("@/assets/images/icons/back.png")}
+            style={{ width: 28, height: 28 }}
+            resizeMode="contain"
+          />
+          <Text style={{ color: "#1B4332", fontSize: 16, marginLeft: 4 }}>Back</Text>
         </Pressable>
 
         <View className="items-center mt-10">

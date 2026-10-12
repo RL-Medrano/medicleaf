@@ -129,7 +129,7 @@ export default function SignupScreen() {
         if (error.message.toLowerCase().includes("already registered")) {
           Alert.alert(
             "Account already exists",
-            "That email is already registered. Try logging in instead."
+            "That email is already registered. Try logging in instead. If you were trying to create a new account just now, check your inbox — a confirmation link may already be on its way."
           );
         } else {
           Alert.alert("Something went wrong", error.message);
@@ -171,10 +171,12 @@ export default function SignupScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
       <View className="flex-1 px-6">
-        <Pressable onPress={handleBack}>
+        {/* Sits a little lower (mt-2) so it isn't crowding the status bar,
+            and slightly larger (28px) for an easier tap target. */}
+        <Pressable onPress={handleBack} className="mt-2 self-start" hitSlop={8}>
           <Image
             source={require("@/assets/images/icons/back.png")}
-            style={{ width: 24, height: 24 }}
+            style={{ width: 28, height: 28 }}
             resizeMode="contain"
           />
         </Pressable>
@@ -328,8 +330,11 @@ export default function SignupScreen() {
             <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
               Password
             </Text>
+            {/* The input carries the same py-3 as the other fields (instead
+                of the wrapper) so this box is exactly the same height as
+                the email field. */}
             <View
-              className="rounded-xl px-4 py-3 mb-4 flex-row items-center justify-between"
+              className="rounded-xl px-4 mb-4 flex-row items-center"
               style={{ backgroundColor: "#FFFFFF" }}
             >
               <TextInput
@@ -337,9 +342,13 @@ export default function SignupScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoComplete="password-new"
-                style={{ flex: 1, color: "#1B4332" }}
+                className="py-3 flex-1"
+                style={{ color: "#1B4332" }}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                className="pl-2"
+              >
                 <Image
                   source={
                     showPassword
@@ -355,8 +364,10 @@ export default function SignupScreen() {
             <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
               Confirm Password
             </Text>
+            {/* Same py-3-on-the-input treatment as above — keeps this box
+                the same height as the email and password fields. */}
             <View
-              className="rounded-xl px-4 py-3 mb-4 flex-row items-center justify-between"
+              className="rounded-xl px-4 mb-4 flex-row items-center"
               style={{ backgroundColor: "#FFFFFF" }}
             >
               <TextInput
@@ -364,9 +375,13 @@ export default function SignupScreen() {
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showConfirmPassword}
                 autoComplete="password-new"
-                style={{ flex: 1, color: "#1B4332" }}
+                className="py-3 flex-1"
+                style={{ color: "#1B4332" }}
               />
-              <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+              <Pressable
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="pl-2"
+              >
                 <Image
                   source={
                     showConfirmPassword

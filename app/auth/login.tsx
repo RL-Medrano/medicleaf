@@ -16,6 +16,7 @@ import { router } from "expo-router";
 import Checkbox from "expo-checkbox";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/utils/supabase";
+import { checkIsOnline } from "@/utils/network";
 import { nextRouteAfterSignIn } from "@/utils/pin";
 
 const SAVED_EMAIL_KEY = "medicleaf_saved_email";
@@ -57,6 +58,18 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+
+    // Fail fast with a friendly message (same wording style as signup and
+    // Google sign-in) instead of firing the request and surfacing a raw
+    // fetch error. checkIsOnline never throws — it resolves false on
+    // timeout or network trouble, so no try/catch needed here.
+    const online = await checkIsOnline();
+    if (!online) {
+      setLoading(false);
+      Alert.alert("You're offline", "Connect to the internet to sign in.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
@@ -113,10 +126,12 @@ export default function LoginScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
       <View className="flex-1 px-6">
-        <Pressable onPress={() => router.back()}>
+        {/* Sits a little lower (mt-2) so it isn't crowding the status bar,
+            and slightly larger (28px) for an easier tap target. */}
+        <Pressable onPress={() => router.back()} className="mt-2 self-start" hitSlop={8}>
           <Image
             source={require("@/assets/images/icons/back.png")}
-            style={{ width: 24, height: 24 }}
+            style={{ width: 28, height: 28 }}
             resizeMode="contain"
           />
         </Pressable>
@@ -161,8 +176,11 @@ export default function LoginScreen() {
               <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
                 Password
               </Text>
+              {/* The input carries the same py-3 as the email field (instead
+                  of the wrapper) — that keeps both white boxes exactly the
+                  same height; the wrapper just holds input + eye icon. */}
               <View
-                className="rounded-xl px-4 py-3 mb-2 flex-row items-center justify-between"
+                className="rounded-xl px-4 mb-2 flex-row items-center"
                 style={{ backgroundColor: "#FFFFFF" }}
               >
                 <TextInput
@@ -170,9 +188,13 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoComplete="password"
-                  style={{ flex: 1, color: "#1B4332" }}
+                  className="py-3 flex-1"
+                  style={{ color: "#1B4332" }}
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="pl-2"
+                >
                   <Image
                     source={
                       showPassword

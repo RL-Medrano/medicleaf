@@ -327,7 +327,7 @@ export default function HomeScreen() {
               </View>
             </Animated.View>
           ) : isGuest ? (
-            <GuestPrompt message="Create or Log in your account to see recent scan" />
+            <GuestPrompt message="Create or Log in your account to see recent scan" flush />
           ) : recentScan ? (
             <Pressable
               onPress={() =>
@@ -491,7 +491,7 @@ export default function HomeScreen() {
               </View>
             </Animated.View>
           ) : isGuest ? (
-            <GuestPrompt message="Create or Log in your account to see others posts" />
+            <GuestPrompt message="Create or Log in your account to see others posts" flush />
           ) : recentPost ? (
             <Pressable
               onPress={() => router.push("/tab/community")}

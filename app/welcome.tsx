@@ -104,11 +104,11 @@ export default function WelcomeScreen() {
             style={{ width: 160, height: 160 }}
             resizeMode="contain"
           />
-          <Text className="text-4xl font-bold mt-4" style={{ color: "#1B4332" }}>
+          <Text className="text-[40px] font-bold mt-4" style={{ color: "#1B4332" }}>
             MedicLeaf
           </Text>
           <Text
-            className="text-sm text-center mt-2 px-6"
+            className="text-base text-center mt-2 px-6"
             style={{ color: "#40916C" }}
           >
             Your companion in discovering medicinal plant and natural healing
@@ -133,7 +133,7 @@ export default function WelcomeScreen() {
                   style={{ width: 20, height: 20, marginRight: 8 }}
                   resizeMode="contain"
                 />
-                <Text className="font-bold text-base" style={{ color: "#2D6A4F" }}>
+                <Text className="font-bold text-lg" style={{ color: "#2D6A4F" }}>
                   Continue with Google
                 </Text>
               </>
@@ -145,7 +145,7 @@ export default function WelcomeScreen() {
             className="rounded-full py-4 items-center mb-3"
             style={{ backgroundColor: "#40916C" }}
           >
-            <Text className="text-white font-bold text-base">Sign Up</Text>
+            <Text className="text-white font-bold text-lg">Sign Up</Text>
           </Pressable>
 
           <Pressable
@@ -157,7 +157,7 @@ export default function WelcomeScreen() {
             {guestLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white font-bold text-base">
+              <Text className="text-white font-bold text-lg">
                 Continue as Guest
               </Text>
             )}
@@ -167,9 +167,13 @@ export default function WelcomeScreen() {
             onPress={() => router.push("/auth/login")}
             className="flex-row justify-center"
           >
-            <Text className="font-semibold text-sm" style={{ color: "#40916C" }}>
+            {/* "Sign in Here" is underlined so it reads as the tap target —
+                users with an account know exactly where to press. */}
+            <Text className="font-semibold text-base" style={{ color: "#40916C" }}>
               Already have an account?{" "}
-              <Text style={{ color: "#2D6A4F" }}>Sign in Here</Text>
+              <Text style={{ color: "#2D6A4F", textDecorationLine: "underline" }}>
+                Sign in Here
+              </Text>
             </Text>
           </Pressable>
         </View>
