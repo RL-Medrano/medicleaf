@@ -447,7 +447,7 @@ export const PLANTS: Plant[] = [
   {
     id: "calamansi",
     name: "Calamansi",
-    scientific_name: "Citrus microcarpa",
+    scientific_name: "Citrus × microcarpa",
     family: "Rutaceae (Citrus family)",
     imageUrl: cloudinaryUrl("plants/calamansi.jpg"),
     images: [cloudinaryUrl("plants/calamansi.jpg"), cloudinaryUrl("plants/calamansi-2.jpg"), cloudinaryUrl("plants/calamansi-3.jpg"), cloudinaryUrl("plants/calamansi-4.jpg"), cloudinaryUrl("plants/calamansi-5.jpg")],
@@ -529,7 +529,7 @@ export const PLANTS: Plant[] = [
   {
     id: "dayap",
     name: "Dayap",
-    scientific_name: "Citrus aurantiifolia",
+    scientific_name: "Citrus × aurantiifolia",
     family: "Rutaceae (Citrus family)",
     imageUrl: cloudinaryUrl("plants/dayap.jpg"),
     images: [cloudinaryUrl("plants/dayap.jpg"), cloudinaryUrl("plants/dayap-2.jpg"), cloudinaryUrl("plants/dayap-3.jpg"), cloudinaryUrl("plants/dayap-4.jpg"), cloudinaryUrl("plants/dayap-5.jpg")],
@@ -1584,7 +1584,7 @@ export const PLANTS: Plant[] = [
   {
     id: "yerba-buena",
     name: "Yerba Buena",
-    scientific_name: "Mentha cordifolia",
+    scientific_name: "Mentha × villosa",
     family: "Lamiaceae (Mint family)",
     imageUrl: cloudinaryUrl("plants/yerba-buena.jpg"),
     images: [cloudinaryUrl("plants/yerba-buena.jpg"), cloudinaryUrl("plants/yerba-buena-2.jpg"), cloudinaryUrl("plants/yerba-buena-3.jpg"), cloudinaryUrl("plants/yerba-buena-4.jpg"), cloudinaryUrl("plants/yerba-buena-5.jpg")],

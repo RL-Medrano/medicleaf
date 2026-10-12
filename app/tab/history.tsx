@@ -1,26 +1,51 @@
-import React, { useCallback, useState } from "react";
-import { View, Text, Image, Pressable, FlatList, StatusBar } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  FlatList,
+  StatusBar,
+  RefreshControl,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
-import { supabase } from "@/utils/supabase";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
+import {
+  fetchScanHistory,
+  getScanHistory,
+  getStaleScanHistory,
+  type ScanItem,
+} from "@/utils/scanHistory";
 import { GuestPrompt } from "@/components/GuestPrompt";
-
-type ScanItem = {
-  id: string;
-  name: string;
-  accuracy: number;
-  date: string;
-  time: string;
-  image_url: string;
-};
+import HistoryWalkthrough from "@/components/HistoryWalkthrough";
+import RingLoader from "@/components/RingLoader";
 
 export default function HistoryScreen() {
   const [scans, setScans] = useState<ScanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Pull-to-refresh spinner, kept separate from `loading` so a manual
+  // refresh doesn't swap the list out for the big loading animation.
+  const [refreshing, setRefreshing] = useState(false);
+  // Stops two rapid focuses from stacking two identical queries.
+  const inFlight = useRef(false);
+
+  /* First-run walkthrough (the "Your scan history" mockup) */
+  // The Guide sends ?walkthrough=1 only from an unfinished row, and this
+  // screen marks the guide's step done on every visit (useFocusEffect
+  // below) — trusting the param avoids racing that write, so it plays
+  // exactly once per new account.
+  const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  // The content area below the header is what the step spotlights.
+  const contentRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (walkthrough === "1") setShowWalkthrough(true);
+  }, [walkthrough]);
 
   useFocusEffect(
     useCallback(() => {
@@ -31,39 +56,77 @@ export default function HistoryScreen() {
     }, [])
   );
 
-  async function loadScans() {
-    setLoading(true);
+  /**
+   * @param force skip the cache (pull-to-refresh). Plain focus uses the
+   *              cache when it's fresh, so tab-hopping no longer fires the
+   *              same select at Supabase every single time.
+   */
+  async function loadScans(force = false) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLoadFailed(false);
 
-    // getAuthState() reads the stored session (works offline, so a signed-in
-    // member isn't mistaken for a guest) and also recognises a local guest,
-    // who has no session at all.
-    const { user, isGuest: guest } = await getAuthState();
+    try {
+      // getAuthState() reads the stored session (works offline, so a signed-in
+      // member isn't mistaken for a guest) and also recognises a local guest,
+      // who has no session at all.
+      const { user, isGuest: guest } = await getAuthState();
 
-    if (!user || guest) {
-      setIsGuest(true);
-      setScans([]);
-      setLoading(false);
-      return;
+      if (!user || guest) {
+        setIsGuest(true);
+        setScans([]);
+        setLoading(false);
+        return;
+      }
+
+      setIsGuest(false);
+
+      // Fresh cache (nothing changed, still inside the TTL) → render from
+      // memory, zero queries.
+      const fresh = force ? null : getScanHistory(user.id);
+      if (fresh) {
+        setScans(fresh);
+        setLoading(false);
+        return;
+      }
+
+      // Older copy exists → keep it on screen and revalidate silently.
+      // The loading animation only appears when we have nothing at all.
+      const stale = getStaleScanHistory(user.id);
+      if (stale) {
+        setScans(stale);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const freshScans = await fetchScanHistory(user.id);
+        setScans(freshScans);
+      } catch (err) {
+        // Don't show "no scans yet" when the real problem is the load failed
+        // (for example, no connection). Stale rows stay put if we had any.
+        console.error("[history] load failed:", (err as Error).message);
+        setLoadFailed(true);
+      } finally {
+        setLoading(false);
+      }
+    } finally {
+      inFlight.current = false;
     }
+  }
 
-    setIsGuest(false);
-
-    const { data, error } = await supabase
-      .from("scans")
-      .select("id, name, accuracy, date, time, image_url")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      // Don't show "no scans yet" when the real problem is the load failed
-      // (for example, no connection).
-      console.error("[history] load failed:", error.message);
-      setLoadFailed(true);
-    } else if (data) {
-      setScans(data);
+  // Pull-to-refresh: the one guaranteed way to force a fresh fetch now
+  // that plain focus is cached.
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await loadScans(true);
+    } finally {
+      // Also covers loadScans bailing out on an already-running load.
+      setRefreshing(false);
     }
-    setLoading(false);
   }
 
   function formatDate(dateValue: string) {
@@ -85,80 +148,125 @@ export default function HistoryScreen() {
     const [hours, minutes] = timeValue.split(":");
     const date = new Date();
     date.setHours(Number(hours), Number(minutes));
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    return date
+      .toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      .replace("AM", "am")
+      .replace("PM", "pm");
   }
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
+    <View className="flex-1">
+      <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="py-4 items-center" style={{ backgroundColor: "#FFFFFF" }}>
-        <Text className="text-2xl font-bold" style={{ color: "#1B4332" }}>
-          History
-        </Text>
-      </View>
+        <View className="py-4 items-center" style={{ backgroundColor: "#FFFFFF" }}>
+          <Text className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
+            History
+          </Text>
+        </View>
 
-      {isGuest ? (
-        <GuestPrompt message="Create or Log in your account to save and visit your recent scan" />
-      ) : (
-        <FlatList
+        <View ref={contentRef} className="flex-1">
+          {isGuest ? (
+            <GuestPrompt message="Create or Log in your account to save and visit your recent scan" />
+          ) : (
+            <FlatList
           data={scans}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 20 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#40916C"
+              colors={["#40916C"]}
+            />
+          }
           ListEmptyComponent={
-            !loading ? (
+            loading ? (
+              // First load with nothing cached yet — spinning ring +
+              // label so the empty gap reads as "still fetching".
+              <View className="items-center mt-20">
+                <RingLoader size={60} strokeWidth={6} />
+                <Text className="mt-4 font-semibold" style={{ color: "#40916C", fontSize: 16 }}>
+                  Loading your scans…
+                </Text>
+              </View>
+            ) : (
               <Text className="text-center mt-10" style={{ color: "#40916C" }}>
                 {loadFailed
                   ? "Couldn't load your scans. Connect to the internet and try again."
                   : "You haven't saved any scans yet."}
               </Text>
-            ) : null
+            )
           }
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
                 router.push({ pathname: "/scanresult", params: { scanId: item.id } })
               }
-              className="rounded-2xl p-3 flex-row items-center mb-3"
+              className="rounded-2xl p-3 flex-row items-center mb-4"
               style={{ backgroundColor: "#FFFFFF" }}
             >
               <Image
                 source={{ uri: item.image_url }}
-                style={{ width: 94, height: 74, borderRadius: 12 }}
+                style={{ width: 112, height: 112, borderRadius: 12 }}
               />
-              <View className="flex-1 ml-3">
-                <Text
-                  className="font-bold"
-                  style={{ color: "#1B4332", fontSize: 17 }}
-                >
-                  {item.name}
-                </Text>
-                <Text style={{ color: "#374151", fontSize: 14 }}>
-                  Accuracy: {item.accuracy}%
-                </Text>
-                <Text
-                  className="mt-2"
-                  style={{ color: "#6b7280", fontSize: 13 }}
-                >
+              <View className="flex-1 ml-3 justify-center">
+                <View className="flex-row items-center justify-between">
+                  <Text
+                    className="font-bold flex-1"
+                    style={{ color: "#1A1A1A", fontSize: 18 }}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                  <View
+                    className="rounded-full px-3 py-1 ml-2"
+                    style={{ backgroundColor: "#EDF2E9" }}
+                  >
+                    <Text
+                      className="font-bold"
+                      style={{ color: "#1A1A1A", fontSize: 13 }}
+                    >
+                      {item.accuracy}%
+                    </Text>
+                  </View>
+                </View>
+                <Text className="mt-1.5" style={{ color: "#6b7280", fontSize: 14 }}>
                   Date: {formatDate(item.date)}
                 </Text>
-                <Text style={{ color: "#6b7280", fontSize: 13 }}>
+                <Text style={{ color: "#6b7280", fontSize: 14 }}>
                   Time: {formatTime(item.time)}
                 </Text>
               </View>
-              <Image
-                source={require("@/assets/images/icons/Chevron_right3.png")}
-                style={{ width: 22, height: 22 }}
-                resizeMode="contain"
-              />
+              <Text
+                style={{
+                  fontSize: 22,
+                  color: "#6b7280",
+                  marginLeft: 6,
+                }}
+              >
+                ›
+              </Text>
             </Pressable>
           )}
+            />
+          )}
+        </View>
+      </SafeAreaView>
+
+      {/* First-run coach-mark walkthrough — sent by the Guide's Go button
+          while the "History" row is unfinished. */}
+      {showWalkthrough && (
+        <HistoryWalkthrough
+          targets={{ content: contentRef }}
+          onFinish={() => setShowWalkthrough(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

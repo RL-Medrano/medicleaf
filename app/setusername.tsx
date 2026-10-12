@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
 import { enableTutorial } from "@/utils/tutorial";
+import { nextRouteAfterSignIn } from "@/utils/pin";
 
 export default function SetUsernameScreen() {
   const [username, setUsername] = useState("");
@@ -27,9 +28,12 @@ export default function SetUsernameScreen() {
         return;
       }
 
+      // Local session read — same user object (incl. user_metadata),
+      // no Auth-server round-trip.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
 
       if (!user) {
         Alert.alert("Something went wrong", "Please try signing in again.");
@@ -82,11 +86,13 @@ export default function SetUsernameScreen() {
       // Reaching this screen means the account was just created through
       // Google (email sign-ups never see it — the DB trigger already had
       // everything from the signup form). Enroll it in the first-run
-      // Tutorial Guide before heading to Home. Idempotent: if email sign-up
+      // Tutorial Guide before continuing. Idempotent: if email sign-up
       // already enrolled this id, progress is left untouched.
       await enableTutorial(user.id);
 
-      router.replace("/tab/home");
+      // New Google accounts have no PIN yet, so this lands on the create
+      // screen rather than straight into Home.
+      router.replace(await nextRouteAfterSignIn());
     } catch (err) {
       console.error("[setusername] save failed:", err);
       Alert.alert("Something went wrong", "Couldn't save your username. Please try again.");

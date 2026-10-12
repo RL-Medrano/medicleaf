@@ -14,6 +14,7 @@ import { supabase } from "@/utils/supabase";
 import { signInWithGoogle } from "@/utils/googleAuth";
 import { checkIsOnline } from "@/utils/network";
 import { setLocalGuest } from "@/utils/guest";
+import { nextRouteAfterSignIn } from "@/utils/pin";
 
 export default function WelcomeScreen() {
   const [guestLoading, setGuestLoading] = useState(false);
@@ -45,7 +46,9 @@ export default function WelcomeScreen() {
     if (!profile?.username) {
       router.replace("/setusername");
     } else {
-      router.replace("/tab/home");
+      // Google sign-in gets the same PIN step as password sign-in.
+      // Without this it would be a route straight past the gate.
+      router.replace(await nextRouteAfterSignIn());
     }
   }
 

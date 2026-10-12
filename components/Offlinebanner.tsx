@@ -29,7 +29,24 @@ export function OfflineBanner() {
     // Top inset keeps the red stripe clear of the clock/battery row — the
     // strip above it stays the normal screen colour, so only the message
     // itself is red (as in the mockup) instead of a full red status bar.
-    <View style={{ paddingTop: insets.top, backgroundColor: "#D8F3DC" }}>
+    //
+    // marginBottom: -insets.top is the fix for the blank band that used to
+    // appear under the red stripe: this banner pads for the status bar AND
+    // every screen pads for it too (SafeAreaView edges top), so the space
+    // was counted twice — screens were pushed down by the banner and then
+    // reserved the status bar again underneath it. The negative margin
+    // cancels the navigator's reservation so content starts right below the
+    // banner. zIndex + elevation keep the banner painted over the slice of
+    // the navigator that is now tucked behind this strip.
+    <View
+      style={{
+        marginBottom: -insets.top,
+        zIndex: 10,
+        elevation: 10,
+        paddingTop: insets.top,
+        backgroundColor: "#D8F3DC",
+      }}
+    >
       <View
         style={{
           backgroundColor: "#991B1B",

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, TextInput, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
 import { getRandomPlants, PLANTS, Plant, PlantTag } from "@/data/plants";
 import { CachedPlantImage } from "@/components/CachedPlantImage";
+import SearchWalkthrough from "@/components/SearchWalkthrough";
 
 const DEFAULT_TAGS: PlantTag[] = ["Cough", "Fever", "Indigestion", "Wound", "Diabetes"];
 const MAX_RECENT_SEARCHES = 8;
@@ -27,6 +28,28 @@ export default function SearchScreen() {
   // set so two visits in a row don't hand out the exact same five.
   const [recommended, setRecommended] = useState<Plant[]>(() => getRandomPlants(5));
   const previousRecommendIds = useRef<string[]>(recommended.map((plant) => plant.id));
+
+  /* First-run walkthrough (the "Search Medicinal Plant" mockups) */
+  // Home's Tutorial Guide pushes /search?walkthrough=1 while the Library
+  // row is unfinished. Unlike Scan, no extra state check is needed here:
+  // the Guide only sends the param from an unfinished row, and this
+  // screen marks the step done on visit anyway (useFocusEffect below) —
+  // re-checking would race that write.
+  const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  // Live scroll bookkeeping for the walkthrough's auto-scroll.
+  const scrollYRef = useRef(0);
+  const contentHRef = useRef(0);
+  const viewportHRef = useRef(0);
+  // The three elements each walkthrough step highlights.
+  const searchBarRef = useRef<View>(null);
+  const recentSearchesRef = useRef<View>(null);
+  const recommendationsRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (walkthrough === "1") setShowWalkthrough(true);
+  }, [walkthrough]);
 
   const isSearching = query.trim().length > 0 || activeTag !== null;
   const showRecentDropdown =
@@ -74,7 +97,17 @@ export default function SearchScreen() {
 
   async function saveRecentSearch(term: string) {
     const trimmed = term.trim();
-    if (!trimmed || !userId) return;
+    if (!trimmed) return;
+
+    // Guests are skipped on purpose (nothing to sync), but a signed-in
+    // account that hasn't resolved yet is a bug — make it visible instead
+    // of silently dropping the term.
+    if (!userId) {
+      if (!isGuestUser) {
+        console.warn("[search] recent search NOT saved — userId not loaded");
+      }
+      return;
+    }
 
     setRecentSearches((prev) =>
       [trimmed, ...prev.filter((q) => q.toLowerCase() !== trimmed.toLowerCase())].slice(
@@ -83,10 +116,39 @@ export default function SearchScreen() {
       )
     );
 
-    await supabase.from("recent_searches").upsert(
-      { user_id: userId, query: trimmed, created_at: new Date().toISOString() },
-      { onConflict: "user_id,query" }
-    );
+    // Delete-then-insert instead of upsert(..., { onConflict: "user_id,query" }).
+    // An ON CONFLICT target only works if the table has a matching UNIQUE
+    // constraint — without one, PostgREST rejects the whole write and the
+    // chip appears (from local state) but is gone on the next visit. This
+    // shape works whether or not that constraint exists, and it also
+    // collapses duplicates already sitting in the table.
+    const { error: deleteError } = await supabase
+      .from("recent_searches")
+      .delete()
+      .eq("user_id", userId)
+      .eq("query", trimmed);
+
+    const { error: insertError } = await supabase.from("recent_searches").insert({
+      user_id: userId,
+      query: trimmed,
+      created_at: new Date().toISOString(),
+    });
+
+    // PostgREST never throws — it returns { error }. Report the whole
+    // object so an RLS rejection or a missing column is identifiable from
+    // the Metro console rather than guessed at.
+    const error = insertError ?? deleteError;
+    if (error) {
+      console.error(
+        "[search] recent search NOT persisted:",
+        JSON.stringify({
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        })
+      );
+    }
   }
 
   async function removeRecentSearch(term: string) {
@@ -132,6 +194,12 @@ export default function SearchScreen() {
   }
 
   function goToDetail(plantId: string) {
+    // Results filter live while typing, so most people never press Enter
+    // or the search icon — they tap a result straight away. Record the
+    // term here too, otherwise that search is silently never saved.
+    // (No-op when the query is empty, i.e. tapping a Recommendation.)
+    handleSubmitSearch();
+
     // plantdetail.tsx reads the plant's slug, which is the same string as
     // the plant's id in data/plants.ts.
     router.push({ pathname: "/plantdetail", params: { slug: plantId } });
@@ -176,221 +244,277 @@ export default function SearchScreen() {
   const emptyLabel = query.trim() ? query.trim() : activeTag ?? "";
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" />
+    <View className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
+        <StatusBar barStyle="dark-content" />
 
-      <View className="flex-row items-center px-5 mt-4">
-        <Pressable onPress={() => router.back()} className="mr-4">
-          <Image
-            source={require("@/assets/images/icons/arrow_left.png")}
-            style={{ width: 20, height: 20 }}
-            resizeMode="contain"
-          />
-        </Pressable>
-        <Text className="text-xl font-bold" style={{ color: "#1B4332" }}>
-          Search Medicinal Plant
-        </Text>
-      </View>
-
-      <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* Search bar */}
-        <View
-          className="flex-row items-center rounded-full px-4 py-3 mt-5"
-          style={{ backgroundColor: "#FFFFFF" }}
-        >
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onSubmitEditing={handleSubmitSearch}
-            returnKeyType="search"
-            placeholder="Search medicinal plant, health issues..."
-            placeholderTextColor="#9ca3af"
-            className="flex-1 text-sm"
-            style={{ color: "#1B4332" }}
-          />
-          <Pressable onPress={handleSubmitSearch} hitSlop={8}>
+        <View className="flex-row items-center px-5 mt-4">
+          <Pressable onPress={() => router.back()} className="mr-4">
             <Image
-              source={require("@/assets/images/icons/search.png")}
-              style={{ width: 18, height: 18 }}
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 20, height: 20 }}
               resizeMode="contain"
             />
           </Pressable>
+          <Text className="text-xl font-bold" style={{ color: "#1B4332" }}>
+            Search Medicinal Plant
+          </Text>
         </View>
 
-        {/* Recent searches dropdown — shown when focused with an empty query */}
-        {showRecentDropdown && (
-          <View className="mt-5">
-            <View className="flex-row justify-between items-center mb-1">
-              <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
-                Recent Searches
-              </Text>
-              <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
-                <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
-                  Clear all
-                </Text>
-              </Pressable>
-            </View>
-
-            {recentSearches.map((term) => (
+        <ScrollView
+          ref={scrollRef}
+          className="flex-1 px-5"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          onLayout={(e) => {
+            viewportHRef.current = e.nativeEvent.layout.height;
+          }}
+          onContentSizeChange={(_, h) => {
+            contentHRef.current = h;
+          }}
+        >
+          {/* Search bar */}
+          <View
+            ref={searchBarRef}
+            className="flex-row items-center rounded-full px-4 py-3 mt-5"
+            style={{ backgroundColor: "#FFFFFF" }}
+          >
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              onSubmitEditing={handleSubmitSearch}
+              returnKeyType="search"
+              placeholder="Search medicinal plant, health issues..."
+              placeholderTextColor="#9ca3af"
+              className="flex-1 text-sm"
+              style={{ color: "#1B4332" }}
+            />
+            {query.length > 0 ? (
               <Pressable
-                key={term}
-                onPress={() => selectRecentSearch(term)}
-                className="flex-row items-center justify-between py-3"
+                onPress={() => {
+                  setQuery("");
+                  setActiveTag(null);
+                }}
+                hitSlop={8}
               >
-                <View className="flex-row items-center flex-1 pr-3">
-                  <Image
-                    source={require("@/assets/images/icons/Clock.png")}
-                    style={{ width: 15, height: 15, marginRight: 10 }}
-                    resizeMode="contain"
-                  />
-                  <Text
-                    className="text-sm flex-1"
-                    style={{ color: "#1B4332" }}
-                    numberOfLines={1}
-                  >
-                    {term}
-                  </Text>
-                </View>
-                <Pressable onPress={() => removeRecentSearch(term)} hitSlop={10}>
-                  <Text style={{ fontSize: 15, color: "#9ca3af" }}>✕</Text>
-                </Pressable>
+                <Image
+                  source={require("@/assets/images/icons/close.png")}
+                  style={{ width: 24, height: 24, opacity: 0.5 }}
+                  resizeMode="contain"
+                />
               </Pressable>
-            ))}
+            ) : (
+              <Pressable onPress={handleSubmitSearch} hitSlop={8}>
+                <Image
+                  source={require("@/assets/images/icons/search.png")}
+                  style={{ width: 34, height: 34 }}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            )}
           </View>
-        )}
 
-        {!showRecentDropdown && (
-          <>
-            {!isSearching ? (
-              <>
-                {/* Default browsing state. The "clear" action stays even
-                    when there's nothing to clear — the chips area below is
-                    simply empty for a user with no recent searches. */}
-                <View className="flex-row justify-between items-center mt-6 mb-2">
-                  <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
-                    Recent Searches
-                  </Text>
-                  <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
-                    <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
-                      clear
-                    </Text>
-                  </Pressable>
-                </View>
-                <View className="flex-row flex-wrap">
-                  {recentSearches.map((term) => {
-                    const active = activeTag === term;
-                    return (
-                      <Pressable
-                        key={term}
-                        onPress={() => pressChip(term)}
-                        className="rounded-full px-4 py-2 mr-2 mb-2 border"
-                        style={{
-                          borderColor: "#1B4332",
-                          backgroundColor: active ? "#1B4332" : "#FFFFFF",
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold"
-                          style={{ color: active ? "#FFFFFF" : "#1B4332" }}
-                        >
-                          {term}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {/* Recommendations — 5 plants, reshuffled on every visit */}
-                <Text className="font-bold text-base mt-4 mb-2" style={{ color: "#1B4332" }}>
-                  Recommendations
+          {/* Recent searches dropdown — shown when focused with an empty query */}
+          {showRecentDropdown && (
+            <View className="mt-5">
+              <View className="flex-row justify-between items-center mb-1">
+                <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                  Recent Searches
                 </Text>
+                <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
+                  <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                    Clear all
+                  </Text>
+                </Pressable>
+              </View>
 
-                {recommended.map((plant) => (
-                  <Pressable
-                    key={plant.id}
-                    onPress={() => goToDetail(plant.id)}
-                    className="rounded-2xl p-3 mb-3 flex-row items-center"
-                    style={{ backgroundColor: "#FFFFFF" }}
-                  >
-                    <CachedPlantImage
-                      plantId={plant.id}
-                      remoteUrl={plant.imageUrl}
-                      style={{ width: 64, height: 64, borderRadius: 12 }}
-                    />
-                    <View className="flex-1 ml-3">
-                      <Text className="font-bold" style={{ color: "#1B4332" }}>
-                        {plant.name}
-                      </Text>
-                      <Text className="text-sm" style={{ color: "#374151" }}>
-                        {plant.scientific_name}
-                      </Text>
-                    </View>
+              {recentSearches.map((term) => (
+                <Pressable
+                  key={term}
+                  onPress={() => selectRecentSearch(term)}
+                  className="flex-row items-center justify-between py-3"
+                >
+                  <View className="flex-row items-center flex-1 pr-3">
                     <Image
-                      source={require("@/assets/images/icons/Chevron_right.png")}
-                      style={{ width: 18, height: 18 }}
+                      source={require("@/assets/images/icons/Clock.png")}
+                      style={{ width: 15, height: 15, marginRight: 10 }}
                       resizeMode="contain"
                     />
+                    <Text
+                      className="text-sm flex-1"
+                      style={{ color: "#1B4332" }}
+                      numberOfLines={1}
+                    >
+                      {term}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => removeRecentSearch(term)} hitSlop={10}>
+                    <Text style={{ fontSize: 15, color: "#9ca3af" }}>✕</Text>
                   </Pressable>
-                ))}
-              </>
-            ) : (
-              <>
-                {/* Active search / filter state */}
-                {filteredPlants.map((plant) => (
-                  <Pressable
-                    key={plant.id}
-                    onPress={() => goToDetail(plant.id)}
-                    className="rounded-2xl p-4 mt-5 mb-3"
-                    style={{ backgroundColor: "#FFFFFF" }}
-                  >
-                    <View className="flex-row items-center">
-                      <CachedPlantImage
-                        plantId={plant.id}
-                        remoteUrl={plant.imageUrl}
-                        style={{ width: 64, height: 64, borderRadius: 12 }}
-                      />
-                      <View className="flex-1 ml-3">
-                        <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
-                          {plant.name}
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {!showRecentDropdown && (
+            <>
+              {!isSearching ? (
+                <>
+                  {/* Default browsing state. The "clear" action stays even
+                      when there's nothing to clear — the chips area below is
+                      simply empty for a user with no recent searches. */}
+                  <View ref={recentSearchesRef}>
+                    <View className="flex-row justify-between items-center mt-6 mb-2">
+                      <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                        Recent Searches
+                      </Text>
+                      <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
+                        <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                          clear
                         </Text>
-                        <Text className="text-sm" style={{ color: "#374151" }}>
-                          {plant.scientific_name}
+                      </Pressable>
+                    </View>
+                    <View className="flex-row flex-wrap">
+                      {recentSearches.map((term) => {
+                        const active = activeTag === term;
+                        return (
+                          <Pressable
+                            key={term}
+                            onPress={() => pressChip(term)}
+                            className="rounded-full px-4 py-2 mr-2 mb-2 border"
+                            style={{
+                              borderColor: "#1B4332",
+                              backgroundColor: active ? "#1B4332" : "#FFFFFF",
+                            }}
+                          >
+                            <Text
+                              className="text-xs font-semibold"
+                              style={{ color: active ? "#FFFFFF" : "#1B4332" }}
+                            >
+                              {term}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Recommendations — 5 plants, reshuffled on every visit */}
+                  <View ref={recommendationsRef}>
+                    <Text className="font-bold text-base mt-4 mb-2" style={{ color: "#1B4332" }}>
+                      Recommendations
+                    </Text>
+
+                    {recommended.map((plant) => (
+                      <Pressable
+                        key={plant.id}
+                        onPress={() => goToDetail(plant.id)}
+                        className="rounded-2xl p-3 mb-3 flex-row items-center"
+                        style={{ backgroundColor: "#FFFFFF" }}
+                      >
+                        <CachedPlantImage
+                          plantId={plant.id}
+                          remoteUrl={plant.imageUrl}
+                          style={{ width: 64, height: 64, borderRadius: 12 }}
+                        />
+                        <View className="flex-1 ml-3">
+                          <Text className="font-bold" style={{ color: "#1B4332" }}>
+                            {plant.name}
+                          </Text>
+                          <Text className="text-sm" style={{ color: "#374151" }}>
+                            {plant.scientific_name}
+                          </Text>
+                        </View>
+                        <Image
+                          source={require("@/assets/images/icons/Chevron_right.png")}
+                          style={{ width: 18, height: 18 }}
+                          resizeMode="contain"
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Active search / filter state */}
+                  {filteredPlants.map((plant) => (
+                    <Pressable
+                      key={plant.id}
+                      onPress={() => goToDetail(plant.id)}
+                      className="rounded-2xl p-4 mt-5 mb-3 flex-row items-center"
+                      style={{ backgroundColor: "#FFFFFF" }}
+                    >
+                      <View className="flex-1">
+                        <View className="flex-row items-center">
+                          <CachedPlantImage
+                            plantId={plant.id}
+                            remoteUrl={plant.imageUrl}
+                            style={{ width: 96, height: 96, borderRadius: 14 }}
+                          />
+                          <View className="flex-1 ml-3">
+                            <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                              {plant.name}
+                            </Text>
+                            <Text className="text-sm mt-0.5" style={{ color: "#6b7280" }}>
+                              {plant.scientific_name}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text
+                          className="text-xs leading-5 mt-3"
+                          style={{ color: "#6b7280" }}
+                          numberOfLines={4}
+                          ellipsizeMode="tail"
+                        >
+                          {plant.about}
                         </Text>
                       </View>
-                    </View>
 
-                    <View className="flex-row items-center mt-3">
-                      <Text
-                        className="flex-1 text-xs leading-5 pr-2"
-                        style={{ color: "#6b7280" }}
-                        numberOfLines={3}
-                        ellipsizeMode="tail"
-                      >
-                        {plant.about}
-                      </Text>
                       <Image
                         source={require("@/assets/images/icons/Chevron_right.png")}
-                        style={{ width: 18, height: 18 }}
+                        style={{ width: 18, height: 18, marginLeft: 8, opacity: 0.6 }}
                         resizeMode="contain"
                       />
-                    </View>
-                  </Pressable>
-                ))}
+                    </Pressable>
+                  ))}
 
-                {filteredPlants.length === 0 && (
-                  <Text className="text-sm text-center mt-8" style={{ color: "#6b7280" }}>
-                    {emptyLabel ? `No plants found for "${emptyLabel}"` : "No plants found"}
-                  </Text>
-                )}
-              </>
-            )}
-          </>
-        )}
+                  {filteredPlants.length === 0 && (
+                    <Text className="text-sm text-center mt-8" style={{ color: "#6b7280" }}>
+                      {emptyLabel ? `No plants found for "${emptyLabel}"` : "No plants found"}
+                    </Text>
+                  )}
+                </>
+              )}
+            </>
+          )}
 
-        <View style={{ height: 24 }} />
-      </ScrollView>
-    </SafeAreaView>
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* First-run coach-mark walkthrough — sent by the Guide's Go button
+          while the Library step is unfinished (see SearchWalkthrough). */}
+      {showWalkthrough && (
+        <SearchWalkthrough
+          targets={{
+            searchBar: searchBarRef,
+            recentSearches: recentSearchesRef,
+            recommendations: recommendationsRef,
+          }}
+          scrollYRef={scrollYRef}
+          contentHRef={contentHRef}
+          viewportHRef={viewportHRef}
+          scrollTo={(y) => scrollRef.current?.scrollTo({ y, animated: false })}
+          onFinish={() => setShowWalkthrough(false)}
+        />
+      )}
+    </View>
   );
 }

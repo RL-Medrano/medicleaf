@@ -29,7 +29,16 @@ function IconSlot({ children }: { children: React.ReactNode }) {
 }
 
 export default function ScanningScreen() {
-  const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
+  // imageSource / photoLat / photoLng describe the photo's origin and its
+  // capture-time location — they're only forwarded to Scan Result here,
+  // classification itself never touches them.
+  const { imageUri, imageSource, locationDenied, photoLat, photoLng } = useLocalSearchParams<{
+    imageUri: string;
+    imageSource?: string;
+    locationDenied?: string;
+    photoLat?: string;
+    photoLng?: string;
+  }>();
   const [status, setStatus] = useState<Status>("checking");
 
   // Title follows the state in the Figma design: scanning → successfully
@@ -103,6 +112,10 @@ export default function ScanningScreen() {
             accuracy: String(accuracy),
             date: now.toISOString().slice(0, 10), // YYYY-MM-DD
             time: now.toTimeString().slice(0, 5), // HH:MM
+            imageSource: imageSource ?? "",
+            locationDenied: locationDenied ?? "",
+            photoLat: photoLat ?? "",
+            photoLng: photoLng ?? "",
           },
         });
       }, 600);

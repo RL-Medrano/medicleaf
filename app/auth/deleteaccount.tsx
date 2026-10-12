@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/utils/supabase";
+import { clearPinVerified } from "@/utils/pin";
 
 // Must match the keys used by the login screen's "Remember me" feature.
 const SAVED_EMAIL_KEY = "medicleaf_saved_email";
@@ -57,7 +58,9 @@ export default function DeleteAccountScreen() {
       }
 
       // The user no longer exists on the server, so only clear the local
-      // session — don't ask the server to revoke it.
+      // session — don't ask the server to revoke it. The PIN flag goes too,
+      // since the next account on this device must verify its own.
+      await clearPinVerified();
       await supabase.auth.signOut({ scope: "local" });
       router.replace("/welcome");
     } catch (err) {
@@ -82,7 +85,7 @@ export default function DeleteAccountScreen() {
   const deletedItems = [
     "Your profile information",
     "Scan history",
-    "Posts and interaction with other users",
+    "Posts and Interaction with other users",
     "App settings and preferences",
   ];
 
@@ -101,7 +104,7 @@ export default function DeleteAccountScreen() {
           </Pressable>
           <Text
             className="flex-1 text-xl font-bold text-center"
-            style={{ color: "#1B4332", marginRight: 24 }}
+            style={{ color: "#1A1A1A", marginRight: 24 }}
           >
             Delete Account
           </Text>
@@ -117,7 +120,7 @@ export default function DeleteAccountScreen() {
 
         <Text
           className="text-lg font-bold text-center mt-6"
-          style={{ color: "#1B4332" }}
+          style={{ color: "#1A1A1A" }}
         >
           Delete Your Account?
         </Text>
@@ -130,16 +133,21 @@ export default function DeleteAccountScreen() {
         </Text>
 
         <View
-          className="rounded-2xl p-4 mt-8"
+          className="rounded-2xl p-5 mt-8"
           style={{ backgroundColor: "#FEE2E2" }}
         >
-          <Text className="font-bold mb-2" style={{ color: "#DC2626" }}>
+          <Text className="font-bold mb-3" style={{ color: "#DC2626" }}>
             What will be deleted?
           </Text>
           {deletedItems.map((item) => (
-            <Text key={item} className="text-sm mb-1" style={{ color: "#374151" }}>
-              • {item}
-            </Text>
+            <View key={item} className="flex-row mb-2.5" style={{ gap: 8 }}>
+              <Text className="text-sm" style={{ color: "#1A1A1A" }}>
+                •
+              </Text>
+              <Text className="text-sm flex-1" style={{ color: "#1A1A1A" }}>
+                {item}
+              </Text>
+            </View>
           ))}
         </View>
 
@@ -148,8 +156,8 @@ export default function DeleteAccountScreen() {
         <Pressable
           onPress={handleDeletePress}
           disabled={loading}
-          className="rounded-full py-4 items-center mb-8"
-          style={{ backgroundColor: "#DC2626", opacity: loading ? 0.6 : 1 }}
+          className="rounded-2xl py-4 items-center mb-8"
+          style={{ backgroundColor: "#FF0000", opacity: loading ? 0.6 : 1 }}
         >
           <Text className="text-white font-bold text-base">
             {loading ? "Deleting..." : "Delete Account"}

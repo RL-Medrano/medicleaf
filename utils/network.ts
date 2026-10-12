@@ -16,6 +16,20 @@ import NetInfo from "@react-native-community/netinfo";
  * WAN), so both checks matter.
  */
 export async function checkIsOnline(): Promise<boolean> {
-  const state = await NetInfo.fetch();
-  return !!state.isConnected && state.isInternetReachable !== false;
+  // Bounded: NetInfo.fetch() resolves from native state, but the
+  // isInternetReachable probe behind it does real network I/O. With no
+  // connection that can stall well past the point where this answer is
+  // useful, so a timeout is treated as "not online" — the safe direction,
+  // since callers only use this to skip network work.
+  try {
+    const state = await Promise.race([
+      NetInfo.fetch(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+
+    if (!state) return false;
+    return !!state.isConnected && state.isInternetReachable !== false;
+  } catch {
+    return false;
+  }
 }

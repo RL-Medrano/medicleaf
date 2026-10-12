@@ -85,9 +85,11 @@ export default function EditProfileScreen() {
   async function loadProfile() {
     setLoading(true);
 
+    // Local session read — same user object, no Auth-server round-trip.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     if (!user) {
       setLoading(false);
@@ -199,8 +201,9 @@ export default function EditProfileScreen() {
       }
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
 
       if (!user) return;
 

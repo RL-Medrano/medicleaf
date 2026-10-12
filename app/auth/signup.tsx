@@ -146,8 +146,8 @@ export default function SignupScreen() {
 
       if (data.session) {
         // Confirm email is off (or was toggled off) — session issued
-        // immediately, go straight in.
-        router.replace("/tab/home");
+        // immediately. One step left: the account needs its sign-in PIN.
+        router.replace("/auth/createpin");
       } else {
         // Confirm email is on — account created, but no session until they
         // click the link in their inbox. Don't navigate to Home; they're

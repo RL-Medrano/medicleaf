@@ -7,6 +7,7 @@ import {
   ScrollView,
   StatusBar,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
@@ -61,6 +62,11 @@ export default function HomeScreen() {
   // name and the two account cards render as green skeleton blocks — which
   // is exactly what a slow (or dead) connection looks like on this screen.
   const [loading, setLoading] = useState(true);
+
+  // Pull-to-refresh / logo-tap spinner. Separate from `loading` so a manual
+  // reload doesn't flash the skeletons — it just shows the native spinner.
+  const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   // Gentle pulse on those blocks so "still loading" reads clearly.
   const skeletonPulse = useSkeletonPulse(loading);
@@ -136,6 +142,27 @@ export default function HomeScreen() {
     }
   }
 
+  // Shared reload used by pull-to-refresh and logo tap: re-shuffle the
+  // featured plants and re-fetch profile / scan / post. Guarded so rapid
+  // taps can't stack overlapping loads.
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const nextFeatured = getRandomPlants(3, previousFeaturedIds.current);
+      previousFeaturedIds.current = nextFeatured.map((plant) => plant.id);
+      setFeaturedPlants(nextFeatured);
+      await loadHomeData();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  function handleLogoPress() {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    void handleRefresh();
+  }
+
   // Collapsing/expanding the guide — optimistic in state, best-effort persist.
   function handleTutorialToggle() {
     if (!tutorial) return;
@@ -175,7 +202,19 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
 
-      <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1 px-5"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#1B4332"]}
+            tintColor="#1B4332"
+          />
+        }
+      >
         <View className="flex-row items-center justify-between mt-4">
           <View>
             <Text className="text-sm" style={{ color: "#374151" }}>
@@ -201,11 +240,18 @@ export default function HomeScreen() {
             )}
           </View>
 
-          <Image
-            source={require("@/assets/images/logo/1.png")}
-            style={{ width: 44, height: 44 }}
-            resizeMode="contain"
-          />
+          <Pressable
+            onPress={handleLogoPress}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Reload home"
+          >
+            <Image
+              source={require("@/assets/images/logo/1.png")}
+              style={{ width: 44, height: 44 }}
+              resizeMode="contain"
+            />
+          </Pressable>
         </View>
 
         {/* First-run Tutorial Guide — only enrolled (brand-new) accounts see

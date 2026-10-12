@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
+import { clearPinVerified } from "@/utils/pin";
 
 export default function ChangePasswordScreen() {
   const params = useLocalSearchParams<{ code?: string }>();
@@ -94,6 +95,9 @@ export default function ChangePasswordScreen() {
           text: "OK",
           onPress: async () => {
             await supabase.auth.signOut();
+            // A changed password is a security event — make the next sign-in
+            // re-prove the PIN rather than trusting the stored flag.
+            await clearPinVerified();
             router.replace("/welcome");
           },
         },
@@ -134,63 +138,75 @@ export default function ChangePasswordScreen() {
           />
         </Pressable>
 
-        <Text className="text-4xl font-bold mt-4" style={{ color: "#1B4332" }}>
+        <Text className="text-4xl font-bold mt-4" style={{ color: "#1A1A1A" }}>
           {params.code ? "Reset Password" : "Change Password"}
         </Text>
-        <Text className="text-sm mt-2" style={{ color: "#40916C" }}>
+        <Text className="text-sm mt-2" style={{ color: "#6b7280" }}>
           {params.code ? "Please create your new password" : "Please enter your new password"}
         </Text>
 
         <View className="mt-8">
-          <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+          <Text className="font-bold mb-2" style={{ color: "#1A1A1A" }}>
             New Password
           </Text>
           <View
-            className="rounded-xl px-4 py-3 mb-4 flex-row items-center justify-between"
-            style={{ backgroundColor: "#FFFFFF" }}
+            className="rounded-xl px-4 py-3.5 mb-5 flex-row items-center justify-between"
+            style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" }}
           >
             <TextInput
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry={!showNewPassword}
               autoComplete="password-new"
-              style={{ flex: 1, color: "#1B4332" }}
+              placeholder="Enter new password"
+              placeholderTextColor="#9CA3AF"
+              style={{ flex: 1, color: "#1A1A1A", padding: 0 }}
             />
-            <Pressable onPress={() => setShowNewPassword(!showNewPassword)}>
+            <Pressable
+              onPress={() => setShowNewPassword(!showNewPassword)}
+              hitSlop={10}
+              className="ml-3"
+            >
               <Image
                 source={
                   showNewPassword
                     ? require("@/assets/images/icons/eye_on.png")
                     : require("@/assets/images/icons/eye_off.png")
                 }
-                style={{ width: 20, height: 20 }}
+                style={{ width: 22, height: 22 }}
                 resizeMode="contain"
               />
             </Pressable>
           </View>
 
-          <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+          <Text className="font-bold mb-2" style={{ color: "#1A1A1A" }}>
             Confirm Password
           </Text>
           <View
-            className="rounded-xl px-4 py-3 mb-4 flex-row items-center justify-between"
-            style={{ backgroundColor: "#FFFFFF" }}
+            className="rounded-xl px-4 py-3.5 mb-4 flex-row items-center justify-between"
+            style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" }}
           >
             <TextInput
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
               autoComplete="password-new"
-              style={{ flex: 1, color: "#1B4332" }}
+              placeholder="Re-enter new password"
+              placeholderTextColor="#9CA3AF"
+              style={{ flex: 1, color: "#1A1A1A", padding: 0 }}
             />
-            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+            <Pressable
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              hitSlop={10}
+              className="ml-3"
+            >
               <Image
                 source={
                   showConfirmPassword
                     ? require("@/assets/images/icons/eye_on.png")
                     : require("@/assets/images/icons/eye_off.png")
                 }
-                style={{ width: 20, height: 20 }}
+                style={{ width: 22, height: 22 }}
                 resizeMode="contain"
               />
             </Pressable>
@@ -202,8 +218,8 @@ export default function ChangePasswordScreen() {
         <Pressable
           onPress={handleConfirm}
           disabled={loading}
-          className="rounded-full py-4 items-center mb-6"
-          style={{ backgroundColor: "#1B4332", opacity: loading ? 0.6 : 1 }}
+          className="rounded-2xl py-4 items-center mb-6"
+          style={{ backgroundColor: "#1B5E20", opacity: loading ? 0.6 : 1 }}
         >
           <Text className="text-white font-bold text-base">
             {loading ? "Updating..." : "Confirm"}

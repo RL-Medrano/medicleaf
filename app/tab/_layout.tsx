@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Tabs, router, usePathname } from "expo-router";
 import { Image, Alert, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -10,6 +10,11 @@ export default function TabsLayout() {
   const [isGuest, setIsGuest] = useState(false);
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const pathname = usePathname();
+
+  // Guards the pathname-triggered re-checks below: without this, every
+  // navigation between tabs fires an auth call + 2 table queries.
+  const lastActivityCheck = useRef(0);
+  const ACTIVITY_CHECK_COOLDOWN_MS = 15000;
 
   useEffect(() => {
     checkGuestStatus();
@@ -34,16 +39,16 @@ export default function TabsLayout() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        () => checkNewActivity()
+        () => checkNewActivity(true)
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "posts" },
-        () => checkNewActivity()
+        () => checkNewActivity(true)
       )
       .subscribe();
 
-    checkNewActivity();
+    checkNewActivity(true);
 
     return () => {
       authListener.subscription.unsubscribe();
@@ -51,9 +56,9 @@ export default function TabsLayout() {
     };
   }, []);
 
-  // Re-check whenever the user navigates anywhere — cheap query, and
-  // it's what naturally clears the message-unread part of the dot
-  // after they've read messages in a chat and come back.
+  // Re-check when the user navigates — throttled (see cooldown above),
+  // since every tab switch would otherwise cost 2 table queries. It
+  // still clears promptly: realtime INSERTs bypass the throttle.
   useEffect(() => {
     checkNewActivity();
 
@@ -66,23 +71,34 @@ export default function TabsLayout() {
   }, [pathname]);
 
   async function checkGuestStatus() {
+    // Local session read — same is_anonymous semantics as getUser(),
+    // without the Auth-server round-trip on every auth change.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    setIsGuest(!!user?.is_anonymous);
+      data: { session },
+    } = await supabase.auth.getSession();
+    setIsGuest(!!session?.user?.is_anonymous);
   }
 
-  async function checkNewActivity() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  async function checkNewActivity(force = false) {
+    try {
+      if (!force && Date.now() - lastActivityCheck.current < ACTIVITY_CHECK_COOLDOWN_MS) {
+        return;
+      }
+      lastActivityCheck.current = Date.now();
 
-    if (!user || user.is_anonymous) {
-      setHasNewActivity(false);
-      return;
-    }
+      // Local session read — the user id is all that's needed here, and
+      // getUser() would cost an Auth-server call on every navigation.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
 
-    const [unreadResult, latestPostResult, lastSeenRaw] = await Promise.all([
+      if (!user || user.is_anonymous) {
+        setHasNewActivity(false);
+        return;
+      }
+
+      const [unreadResult, latestPostResult, lastSeenRaw] = await Promise.all([
       supabase
         .from("messages")
         .select("id", { count: "exact", head: true })
@@ -113,6 +129,9 @@ export default function TabsLayout() {
     }
 
     setHasNewActivity(hasUnreadMessages || hasNewPost);
+    } catch (err) {
+      console.error("[tabs] activity check failed:", err);
+    }
   }
 
   function handleRestrictedPress(e: { preventDefault: () => void }) {

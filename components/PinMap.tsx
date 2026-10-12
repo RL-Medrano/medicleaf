@@ -1,12 +1,14 @@
 /**
  * components/PinMap.tsx
  *
- * Shared "drop a pin" map for Create Post and Edit Post.
+ * Shared map for Create Post and Edit Post.
  *
- *   • Single tap → drops / moves the pin.
- *   • Double tap → opens the map full screen so the user can look around
- *     before choosing a spot. The X button at the top-right closes it
- *     (the Android back button does too — see onRequestClose below).
+ *   • Single tap → drops / moves the pin, but ONLY when the caller passes
+ *     `onPinChange`. Without it the map is view-only: the photo's own
+ *     location is displayed and can't be edited.
+ *   • Double tap → opens the map full screen so the user can look around.
+ *     The X button at the top-right closes it (the Android back button
+ *     does too — see onRequestClose below).
  *
  * Why the double tap needs react-native-gesture-handler:
  * MapLibre's Android build dispatches `onPress` from
@@ -59,8 +61,12 @@ const CLOSE_ICON = require("../assets/images/icons/close.png");
 type PinMapProps = {
   /** Current pin, or null when there isn't one yet. */
   coord: MapCoord | null;
-  /** Called with the tapped coordinate (single taps only). */
-  onPinChange: (coord: MapCoord) => void;
+  /**
+   * Called with the tapped coordinate (single taps only). Omit it for a
+   * view-only map — taps then do nothing and only double-tap (full screen)
+   * still works.
+   */
+  onPinChange?: (coord: MapCoord) => void;
   /** Camera zoom, used by both the inline and the full-screen map. */
   zoom: number;
   /** Height of the inline (in-form) map. */
@@ -115,7 +121,8 @@ export default function PinMap({
     : DEFAULT_MAP_CENTER;
 
   function handlePress(event: any) {
-    if (disabled) return;
+    // View-only mode (no onPinChange) — taps must never move the pin.
+    if (disabled || !onPinChange) return;
     // MapLibre v11 events use the NativeSyntheticEvent pattern — the payload
     // lives in event.nativeEvent and coordinates are [longitude, latitude].
     const [longitude, latitude] = event.nativeEvent.lngLat;

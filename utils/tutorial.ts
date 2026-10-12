@@ -170,6 +170,35 @@ export async function markTutorialStep(step: TutorialStepId): Promise<boolean> {
   }
 }
 
+/**
+ * Should a screen open with its first-run walkthrough overlay
+ * (components/CoachWalkthrough.tsx and its wrappers)? Only for accounts
+ * still working through the guide, and only until that step completes —
+ * so a second Go press lands straight on the usable screen. Guests and
+ * veteran accounts are never enrolled, so they never see it.
+ *
+ * Note: only safe for screens that DON'T mark their own step on mount
+ * (the Library step is marked by app/search.tsx on every visit, which
+ * would race this check — its walkthrough trusts the Go button's state
+ * instead, see components/TutorialGuide.tsx).
+ */
+export async function shouldShowWalkthrough(step: TutorialStepId): Promise<boolean> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const user = session?.user;
+    if (!user || user.is_anonymous) return false;
+
+    const state = await getTutorialState(user.id);
+    return !!state && state.enabled && !state.done.includes(step);
+  } catch (err) {
+    console.error("[tutorial] walkthrough check failed:", err);
+    return false;
+  }
+}
+
 /** Remember whether the panel is collapsed (same user scoping as above). */
 export async function setTutorialCollapsed(collapsed: boolean): Promise<void> {
   try {

@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, Image, Pressable, ScrollView, StatusBar, Alert, ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, Modal, Pressable, ScrollView, StatusBar, Alert, ActivityIndicator } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
@@ -35,6 +35,9 @@ export default function ViewPostScreen() {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  // Full-screen viewer — tapping the photo opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   // Reloads every time the screen regains focus, so changes made on the
   // Edit Post screen show up as soon as you come back here.
@@ -221,12 +224,14 @@ export default function ViewPostScreen() {
             {post.caption ?? `Found ${post.name}!`}
           </Text>
 
-          {/* Photo */}
-          <Image
-            source={{ uri: post.image_url }}
-            style={{ width: "100%", height: 260, marginTop: 10 }}
-            resizeMode="cover"
-          />
+          {/* Photo — tap to view full-screen */}
+          <Pressable onPress={() => setViewerUri(post.image_url)}>
+            <Image
+              source={{ uri: post.image_url }}
+              style={{ width: "100%", height: 260, marginTop: 10 }}
+              resizeMode="cover"
+            />
+          </Pressable>
 
           {/* Location pin */}
           <View className="flex-row justify-end" style={{ marginTop: 16, minHeight: 28 }}>
@@ -240,6 +245,43 @@ export default function ViewPostScreen() {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* Image viewer — tap the photo to see it full-screen; tap anywhere
+          or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

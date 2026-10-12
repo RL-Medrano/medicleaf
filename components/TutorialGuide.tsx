@@ -35,9 +35,42 @@ export default function TutorialGuide({ state, onToggle }: Props) {
   const percent = Math.round((doneCount / total) * 100);
 
   function goTo(step: TutorialStep) {
+    const isDone = state.done.includes(step.id);
+
     if (step.openMessages) {
       // Typed routes want a literal pathname for the object form.
       router.push({ pathname: "/tab/community", params: { tab: "messages" } });
+    } else if (step.id === "scanpost") {
+      // These two screens open with a coach-mark walkthrough on arrival.
+      // Only an UNFINISHED row sends the flag: a completed row's press is
+      // a plain navigation (the screen's own check also guards it).
+      router.push({
+        pathname: "/scan",
+        params: isDone ? undefined : { walkthrough: "1" },
+      });
+    } else if (step.id === "library") {
+      router.push({
+        pathname: "/search",
+        params: isDone ? undefined : { walkthrough: "1" },
+      });
+    } else if (step.id === "viewposts") {
+      router.push({
+        pathname: "/tab/community",
+        params: isDone ? undefined : { walkthrough: "1" },
+      });
+    } else if (step.id === "message") {
+      // Message lands on the Messages tab AND runs its walkthrough.
+      router.push({
+        pathname: "/tab/community",
+        params: isDone
+          ? { tab: "messages" }
+          : { tab: "messages", walkthrough: "1" },
+      });
+    } else if (step.id === "history") {
+      router.push({
+        pathname: "/tab/history",
+        params: isDone ? undefined : { walkthrough: "1" },
+      });
     } else {
       router.push(step.route);
     }

@@ -35,9 +35,10 @@ async function fetchFirstResult(url: string): Promise<any | null> {
 
 /**
  * Converts a lat/lng pin into a readable location string, e.g.
- * "Lipa City, Batangas". Call this ONCE when the pin is placed/confirmed
- * on Create Post, then store the result in posts.location_name so the
- * feed never has to re-geocode on every render.
+ * "MK Lina St, Brgy. 1, Lipa City, Batangas, Philippines". Call this ONCE
+ * when the pin is placed/confirmed on Create Post, then store the result
+ * in posts.location_name so the feed never has to re-geocode on every
+ * render.
  */
 export async function reverseGeocode(
   latitude: number,
@@ -51,36 +52,52 @@ export async function reverseGeocode(
     `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}` +
     `&format=json&apiKey=${GEOAPIFY_API_KEY}`;
 
-  // `type=city` asks Geoapify for the city/municipality ADMIN area the
-  // coordinates fall inside. Without it Geoapify matches the nearest
-  // street/POI and fills `city`/`county` from that POI's own address tags
-  // (addr:city), which is often a neighbouring city near city limits — a
-  // pin in Brgy. San Felipe, Padre Garcia was reported as "Lipa, Batangas".
-  let result = await fetchFirstResult(`${base}&type=city`);
+  // Two lookups, each for what it's good at:
+  // - `type=city` gives the ACCURATE admin area (city/province). Without
+  //   it Geoapify matches the nearest street/POI and fills `city` from
+  //   that POI's own address tags, which is often a neighbouring city
+  //   near city limits — a pin in Brgy. San Felipe, Padre Garcia was
+  //   reported as "Lipa, Batangas".
+  // - the plain lookup gives the NEAREST street-level match (housenumber,
+  //   street, barangay/suburb), whose `formatted` is the full address —
+  //   but its city can be the wrong neighbour, so only its street parts
+  //   are used, never its city.
+  const [cityResult, streetResult] = await Promise.all([
+    fetchFirstResult(`${base}&type=city`),
+    fetchFirstResult(base),
+  ]);
 
-  if (!result?.city && !result?.county) {
-    // The city-level lookup didn't yield a usable locality (open water,
-    // unincorporated area, ...) — try a normal nearest-address reverse
-    // lookup, keeping the city-level result if that one is empty too.
-    result = (await fetchFirstResult(base)) ?? result;
-  }
-
-  if (!result) {
+  const admin = cityResult ?? streetResult;
+  if (!admin && !streetResult) {
     return { formatted: "Unknown location", city: null, state: null, country: null };
   }
 
-  // Prefer "City, Province" (e.g. "Lipa City, Batangas") over the full
-  // street-level address, since that matches the Community Feed pin label.
-  const city = result.city ?? result.county ?? null;
-  const state = result.state ?? null;
-  const formatted =
-    city && state ? `${city}, ${state}` : result.formatted ?? "Unknown location";
+  const city = admin?.city ?? admin?.county ?? null;
+  const state = admin?.state ?? null;
+  const country = admin?.country ?? null;
+
+  const streetParts = [
+    [streetResult?.housenumber, streetResult?.street]
+      .filter(Boolean)
+      .join(" "),
+    streetResult?.suburb ?? streetResult?.district ?? null,
+  ].filter((part) => !!part);
+
+  // Full address: street detail + accurate admin area, e.g. "MK Lina St,
+  // Brgy. 1, Lipa City, Batangas, Philippines". Where Geoapify has no
+  // street data (open water, unincorporated area, ...), this degrades
+  // gracefully to just "City, Province, Country".
+  const tailParts = [city, state, admin?.postcode ?? null, country].filter(
+    (part) => !!part
+  );
+  const parts = [...streetParts, ...tailParts];
+  const formatted = parts.length > 0 ? parts.join(", ") : "Unknown location";
 
   return {
     formatted,
     city,
     state,
-    country: result.country ?? null,
+    country,
   };
 }
 

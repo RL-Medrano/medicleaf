@@ -10,14 +10,24 @@ export default function VerifyOtpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
+  // Sign In reached this screen via router.replace(), so there is nothing
+  // behind it to go back to — send the user to the login form instead.
+  function goToLogin() {
+    router.replace("/auth/login");
+  }
+
   async function handleVerify() {
+    if (!email) {
+      Alert.alert("Something went wrong", "No email address was passed to this screen.");
+      return;
+    }
     if (code.trim().length !== 6) {
       Alert.alert("Invalid code", "Please enter the 6-digit code sent to your email.");
       return;
     }
 
     setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email,
       token: code.trim(),
       type: "email",
@@ -29,11 +39,13 @@ export default function VerifyOtpScreen() {
       return;
     }
 
-    // data.session is now set — this is the real login.
+    // Supabase has now issued the session — this is the real, verified
+    // login. Home is the landing spot from here.
     router.replace("/tab/home");
   }
 
   async function handleResend() {
+    if (!email) return;
     setResending(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -42,7 +54,12 @@ export default function VerifyOtpScreen() {
     setResending(false);
 
     if (error) {
-      Alert.alert("Couldn't resend", error.message);
+      Alert.alert(
+        "Couldn't resend",
+        error.message.toLowerCase().includes("rate")
+          ? "Too many codes requested. Wait a minute, then try again."
+          : error.message
+      );
     } else {
       Alert.alert("Code sent", "A new code has been sent to your email.");
     }
@@ -53,7 +70,7 @@ export default function VerifyOtpScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
       <View className="flex-1 px-6">
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={goToLogin} hitSlop={12}>
           <Text style={{ color: "#1B4332", fontSize: 16 }}>{"< Back"}</Text>
         </Pressable>
 
@@ -80,16 +97,16 @@ export default function VerifyOtpScreen() {
 
           <Pressable
             onPress={handleVerify}
-            disabled={loading}
+            disabled={loading || !email}
             className="rounded-full py-4 items-center mb-4"
-            style={{ backgroundColor: "#40916C" }}
+            style={{ backgroundColor: "#40916C", opacity: loading ? 0.6 : 1 }}
           >
             <Text className="text-white font-bold text-base">
               {loading ? "Verifying..." : "Verify & Sign In"}
             </Text>
           </Pressable>
 
-          <Pressable onPress={handleResend} disabled={resending}>
+          <Pressable onPress={handleResend} disabled={resending || !email}>
             <Text
               className="font-semibold text-sm text-center underline"
               style={{ color: "#2D6A4F" }}

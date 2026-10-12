@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, Image, Pressable, Alert, StatusBar, Animated } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, Modal, Pressable, Alert, StatusBar, Animated, ScrollView } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
 import { checkIsOnline } from "@/utils/network";
+import { clearPinVerified } from "@/utils/pin";
 import { GuestPrompt } from "@/components/GuestPrompt";
 import { Skel, SKELETON_RING, useSkeletonPulse } from "@/components/Skel";
 
@@ -18,6 +19,9 @@ export default function ProfileScreen() {
   // True until the first loadProfile() settles. While it's on, the avatar
   // and the name/handle render as skeleton blocks (from the mockup).
   const [loading, setLoading] = useState(true);
+  // Full-screen viewer — tapping the profile picture opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   // Gentle pulse for those blocks so "still loading" reads clearly.
   const skeletonPulse = useSkeletonPulse(loading);
@@ -81,14 +85,20 @@ export default function ProfileScreen() {
             Alert.alert("Couldn't log out", "Please try again.");
             return;
           }
+
+          // Wipe the "PIN already entered" flag, so the next person to sign
+          // in on this device is asked for it again.
+          await clearPinVerified();
           router.replace("/welcome");
         },
       },
     ]);
   }
 
-  function handleHelpSupport() {
-    router.push("/helpsupport");
+  // Opens the About screen (app/about.tsx) — the app's description,
+  // key features, and contact details.
+  function handleAbout() {
+    router.push("/about");
   }
 
   function handleAllPosts() {
@@ -109,16 +119,16 @@ export default function ProfileScreen() {
       onPress: () => router.push("/auth/changepassword"),
     },
     {
-      label: "Help & Support",
-      subtitle: "Get assistance and FAQs",
-      icon: require("@/assets/images/icons/help support icon.png"),
-      onPress: handleHelpSupport,
-    },
-    {
       label: "All Post",
       subtitle: "View your published posts",
       icon: require("@/assets/images/icons/all post icon.png"),
       onPress: handleAllPosts,
+    },
+    {
+      label: "About",
+      subtitle: "Learn about MedicLeaf",
+      icon: require("@/assets/images/icons/help support icon.png"),
+      onPress: handleAbout,
     },
   ];
 
@@ -126,31 +136,27 @@ export default function ProfileScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="px-6 flex-1">
-        <Text className="text-xl font-bold text-center mt-2" style={{ color: "#1B4332" }}>
-          Profile
-        </Text>
-
+      <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {isGuest ? (
           <GuestPrompt message="Create or Log in your account to view your profile" />
         ) : (
           <>
             {loading ? (
-              // Skeleton from the mockup: moss ring + green core, with the
-              // name and handle as green pills underneath.
-              <View className="items-center mt-6">
+              // Skeleton: large avatar with the name and handle as green
+              // pills underneath.
+              <View className="items-center mt-8">
                 <View
                   style={{
-                    width: 110,
-                    height: 110,
-                    borderRadius: 55,
+                    width: 190,
+                    height: 190,
+                    borderRadius: 95,
                     backgroundColor: SKELETON_RING,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
                   <Animated.View style={{ opacity: skeletonPulse }}>
-                    <Skel w={66} h={66} />
+                    <Skel w={114} h={114} />
                   </Animated.View>
                 </View>
                 <Animated.View style={{ opacity: skeletonPulse, alignItems: "center" }}>
@@ -159,30 +165,33 @@ export default function ProfileScreen() {
                 </Animated.View>
               </View>
             ) : (
-              <View className="items-center mt-6">
-                <Image
-                  source={
-                    avatarUrl
-                      ? { uri: avatarUrl }
-                      : require("@/assets/images/icons/place_holder.png")
-                  }
-                  style={{
-                    width: 110,
-                    height: 110,
-                    borderRadius: 55,
-                    backgroundColor: "#D1D5DB",
-                  }}
-                />
-                <Text className="text-xl font-bold mt-3" style={{ color: "#1B4332" }}>
+              <View className="items-center mt-8">
+                {/* Tap the profile picture to view it full-screen */}
+                <Pressable onPress={() => avatarUrl && setViewerUri(avatarUrl)}>
+                  <Image
+                    source={
+                      avatarUrl
+                        ? { uri: avatarUrl }
+                        : require("@/assets/images/icons/place_holder.png")
+                    }
+                    style={{
+                      width: 190,
+                      height: 190,
+                      borderRadius: 95,
+                      backgroundColor: "#D1D5DB",
+                    }}
+                  />
+                </Pressable>
+                <Text className="text-2xl font-bold mt-4" style={{ color: "#1B4332" }}>
                   {fullName || username}
                 </Text>
-                <Text className="text-sm" style={{ color: "#6b7280" }}>
+                <Text className="text-sm mt-0.5" style={{ color: "#6b7280" }}>
                   @{username}
                 </Text>
               </View>
             )}
 
-            <View className="rounded-2xl mt-6" style={{ backgroundColor: "#FFFFFF" }}>
+            <View className="mt-6" style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}>
               {menuItems.map((item, index) => (
                 <Pressable
                   key={item.label}
@@ -193,88 +202,96 @@ export default function ProfileScreen() {
                     borderBottomColor: "#F3F4F6",
                   }}
                 >
-                  <View
-                    className="rounded-xl items-center justify-center"
-                    style={{ width: 40, height: 40, backgroundColor: "#D8F3DC" }}
-                  >
-                    <Image
-                      source={item.icon}
-                      style={{ width: 40, height: 40 }}
-                      resizeMode="contain"
-                    />
-                  </View>
+                  <Image
+                    source={item.icon}
+                    style={{ width: 54, height: 54, borderRadius: 16 }}
+                    resizeMode="contain"
+                  />
                   <View className="flex-1 ml-3">
-                    <Text className="font-bold" style={{ color: "#1B4332" }}>
+                    <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 16 }}>
                       {item.label}
                     </Text>
-                    <Text className="text-xs" style={{ color: "#6b7280" }}>
+                    <Text className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
                       {item.subtitle}
                     </Text>
                   </View>
-                  <Image
-                    source={require("@/assets/images/icons/Chevron_right3.png")}
-                    style={{ width: 16, height: 16 }}
-                    resizeMode="contain"
-                  />
+                  <Text style={{ fontSize: 20, color: "#9ca3af" }}>›</Text>
                 </Pressable>
               ))}
             </View>
 
-            <View className="flex-1" />
-
-            <View className="rounded-2xl mb-6" style={{ backgroundColor: "#FFFFFF" }}>
-              <Pressable
-                onPress={handleLogout}
-                className="flex-row items-center px-4 py-4"
-                style={{ borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}
-              >
-                <View
-                  className="rounded-xl items-center justify-center"
-                  style={{ width: 40, height: 40, backgroundColor: "#D8F3DC" }}
-                >
-                  <Image
-                    source={require("@/assets/images/icons/log out icon.png")}
-                    style={{ width: 40, height: 40 }}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text className="flex-1 ml-3 font-bold" style={{ color: "#1B4332" }}>
-                  Logout
-                </Text>
-                <Image
-                  source={require("@/assets/images/icons/Chevron_right3.png")}
-                  style={{ width: 16, height: 16 }}
-                  resizeMode="contain"
-                />
-              </Pressable>
-
+            <View className="mt-5" style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}>
               <Pressable
                 onPress={() => router.push("/auth/deleteaccount")}
                 className="flex-row items-center px-4 py-4"
+                style={{ borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}
               >
-                <View
-                  className="rounded-xl items-center justify-center"
-                  style={{ width: 40, height: 40, backgroundColor: "#FEE2E2" }}
-                >
-                  <Image
-                    source={require("@/assets/images/icons/delete icon.png")}
-                    style={{ width: 40, height: 40 }}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text className="flex-1 ml-3 font-bold" style={{ color: "#DC2626" }}>
-                  Delete Account
-                </Text>
                 <Image
-                  source={require("@/assets/images/icons/Chevron_right3.png")}
-                  style={{ width: 16, height: 16 }}
+                  source={require("@/assets/images/icons/delete icon.png")}
+                  style={{ width: 54, height: 54, borderRadius: 16 }}
                   resizeMode="contain"
                 />
+                <Text className="flex-1 ml-3 font-bold" style={{ color: "#DC2626", fontSize: 16 }}>
+                  Delete Account
+                </Text>
+                <Text style={{ fontSize: 20, color: "#9ca3af" }}>›</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleLogout}
+                className="flex-row items-center px-4 py-4"
+              >
+                <Image
+                  source={require("@/assets/images/icons/log out icon.png")}
+                  style={{ width: 54, height: 54, borderRadius: 16 }}
+                  resizeMode="contain"
+                />
+                <Text className="flex-1 ml-3 font-bold" style={{ color: "#1A1A1A", fontSize: 16 }}>
+                  Logout
+                </Text>
+                <Text style={{ fontSize: 20, color: "#9ca3af" }}>›</Text>
               </Pressable>
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
+
+      {/* Image viewer — tap the profile picture to see it full-screen; tap
+          anywhere or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

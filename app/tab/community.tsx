@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   Image,
+  Modal,
   Pressable,
   FlatList,
   TextInput,
@@ -11,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/utils/supabase";
@@ -19,6 +20,7 @@ import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
 import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
 import { GuestPrompt } from "@/components/GuestPrompt";
+import CommunityWalkthrough from "@/components/CommunityWalkthrough";
 
 type Post = {
   id: string;
@@ -107,7 +109,14 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   // The tutorial's "Message" step lands here with ?tab=messages so the Go
   // button opens the right tab directly instead of the News Feed.
-  const { tab: requestedTab } = useLocalSearchParams<{ tab?: string }>();
+  // ?focusPost (from tapping a post card inside a chat) lands on the feed.
+  // ?walkthrough=1 (from an unfinished Tutorial Guide row) plays this
+  // tab's coach-mark walkthrough — see components/CommunityWalkthrough.
+  const { tab: requestedTab, focusPost, walkthrough } = useLocalSearchParams<{
+    tab?: string;
+    focusPost?: string;
+    walkthrough?: string;
+  }>();
   const [posts, setPosts] = useState<Post[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,12 +126,57 @@ export default function CommunityScreen() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [newPosts, setNewPosts] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const feedRef = useRef<FlatList<Post>>(null);
+  const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
+  // Each focusPost value scrolls at most once, so a later refresh of the
+  // list doesn't yank the feed back to the post.
+  const focusHandledRef = useRef<string | null>(null);
+  // Full-screen viewer — tapping a photo in a feed post opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+
+  /* First-run walkthroughs (the "View Posts" / "Message" mockups) */
+  // The Guide sends ?walkthrough=1 only from an unfinished row, and this
+  // screen marks the step done on visit (useFocusEffect above) — trusting
+  // the param avoids racing that write. Shown only after the first load,
+  // so the spotlight targets exist.
+  const walkthroughVariant: "feed" | "messages" =
+    requestedTab === "messages" ? "messages" : "feed";
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  // Live scroll bookkeeping for the walkthrough's auto-scroll.
+  const walkScrollYRef = useRef(0);
+  const walkContentHRef = useRef(0);
+  const walkViewportHRef = useRef(0);
+  // The elements the walkthrough steps highlight.
+  const searchBarRef = useRef<View>(null);
+  const firstPostRef = useRef<View>(null);
+  const conversationsRef = useRef<View>(null);
+  const messagesListRef = useRef<FlatList<Conversation>>(null);
+
+  useEffect(() => {
+    if (walkthrough === "1" && !loading) setShowWalkthrough(true);
+  }, [walkthrough, loading]);
+
+  // The active list is the one the engine scrolls (either FlatList).
+  const handleWalkthroughScrollTo = useCallback(
+    (y: number) => {
+      if (activeTab === "feed") {
+        feedRef.current?.scrollToOffset({ offset: y, animated: false });
+      } else {
+        messagesListRef.current?.scrollToOffset({ offset: y, animated: false });
+      }
+    },
+    [activeTab]
+  );
 
   // Deep link with ?tab=messages (used by the tutorial's "Message" Go
   // button) opens the Messages tab directly instead of the News Feed.
   useEffect(() => {
     if (requestedTab === "messages") setActiveTab("messages");
-  }, [requestedTab]);
+    else if (requestedTab === "feed" || focusPost) setActiveTab("feed");
+    // Clear search so the target post can't be filtered out of the list.
+    if (focusPost) setSearchQuery("");
+  }, [requestedTab, focusPost]);
 
   useFocusEffect(
     useCallback(() => {
@@ -173,9 +227,12 @@ export default function CommunityScreen() {
     let cancelled = false;
 
     (async () => {
+      // Local session read — just the user id for the realtime filter,
+      // no Auth-server round-trip on every tab visit.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (cancelled || !user || user.is_anonymous) return;
 
       // Fresh topic per subscription: supabase.channel(name) hands back the
@@ -217,6 +274,30 @@ export default function CommunityScreen() {
     }, 400);
     return () => clearTimeout(timeout);
   }, [searchQuery]);
+
+  // A post card tapped in the chat lands here: once the feed has the
+  // post, scroll to it and flash a highlight so it's obvious which one.
+  useEffect(() => {
+    if (!focusPost || activeTab !== "feed" || loading || isGuest) return;
+    if (focusHandledRef.current === focusPost) return;
+    const index = posts.findIndex((p) => p.id === focusPost);
+    if (index < 0) return; // not loaded yet — wait for the next run
+    focusHandledRef.current = focusPost;
+    // Small delay so the list has laid out before jumping.
+    setTimeout(() => {
+      feedRef.current?.scrollToIndex({ index, viewPosition: 0.2, animated: true });
+    }, 350);
+    setHighlightPostId(focusPost);
+  }, [focusPost, activeTab, loading, isGuest, posts]);
+
+  // Clears the highlight a couple of seconds after it's set — kept out of
+  // the scroll effect so a list refresh can't cancel the timer and leave
+  // the post highlighted forever.
+  useEffect(() => {
+    if (!highlightPostId) return;
+    const timeout = setTimeout(() => setHighlightPostId(null), 2500);
+    return () => clearTimeout(timeout);
+  }, [highlightPostId]);
 
   async function loadBadgeCounts(userId: string) {
     // Unread messages
@@ -280,9 +361,11 @@ export default function CommunityScreen() {
   async function loadConversations() {
     setLoading(true);
 
+    // Local session read — same user id, no Auth-server round-trip.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     if (!user) {
       setLoading(false);
@@ -296,12 +379,15 @@ export default function CommunityScreen() {
     const { data: messages, error } = await supabase
       .from("messages")
       .select(
-        "id, sender_id, receiver_id, content, is_read, created_at, hidden_for_sender, hidden_for_receiver"
+        "id, sender_id, receiver_id, content, is_read, created_at, hidden_for_sender, hidden_for_receiver, image_url, post_id"
       )
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order("created_at", { ascending: false });
 
     if (error || !messages) {
+      // Don't fail silently — this path used to hide exactly the kind of
+      // query error that left the Messages tab looking empty.
+      console.warn("[community] loadConversations failed:", error);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -322,7 +408,15 @@ export default function CommunityScreen() {
 
       if (!seen.has(partnerId)) {
         seen.set(partnerId, {
-          lastMessage: msg.content,
+          // Auto-sent post cards and photo messages carry no text —
+          // fall back to a short label so the preview never renders blank.
+          lastMessage:
+            msg.content ??
+            (msg.post_id
+              ? "Sent a post"
+              : msg.image_url
+                ? "Sent a photo"
+                : ""),
           lastMessageAt: msg.created_at,
           unreadCount: 0,
         });
@@ -400,9 +494,11 @@ export default function CommunityScreen() {
   }
 
   async function deleteConversation(partnerId: string) {
+    // Local session read — the updates below are still RLS-enforced.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     if (!user) return;
 
     // Hide messages you sent AND messages you received in this chat.
@@ -429,10 +525,12 @@ export default function CommunityScreen() {
     loadBadgeCounts(user.id); // refresh the Messages badge
   }
 
-  function goToChat(partnerId: string, partnerUsername: string) {
+  function goToChat(partnerId: string, partnerUsername: string, postId?: string) {
     router.push({
       pathname: "/chat/[userid]",
-      params: { userid: partnerId, username: partnerUsername },
+      params: postId
+        ? { userid: partnerId, username: partnerUsername, postId }
+        : { userid: partnerId, username: partnerUsername },
     });
   }
 
@@ -443,7 +541,9 @@ export default function CommunityScreen() {
   }
 
   function handleSendMessage(post: Post) {
-    goToChat(post.user_id, post.profiles?.username ?? "User");
+    // The post travels along so the chat can show which post is being
+    // inquired about (context card + first-message attachment).
+    goToChat(post.user_id, post.profiles?.username ?? "User", post.id);
   }
 
   function formatDateTime(createdAt: string) {
@@ -504,11 +604,14 @@ export default function CommunityScreen() {
 
     return (
       <View
+        // The first card is the "Browse community discoveries" spotlight
+        // of the View Posts walkthrough.
+        ref={item.id === posts[0]?.id ? firstPostRef : undefined}
         className="rounded-2xl p-4 mb-4"
         style={{
-          backgroundColor: "#FFFFFF",
-          borderWidth: 1,
-          borderColor: "#F0F0F0",
+          backgroundColor: highlightPostId === item.id ? "#B7E4C7" : "#FFFFFF",
+          borderWidth: highlightPostId === item.id ? 2 : 1,
+          borderColor: highlightPostId === item.id ? "#2BB24C" : "#F0F0F0",
         }}
       >
         <View className="flex-row items-center">
@@ -536,11 +639,14 @@ export default function CommunityScreen() {
           {item.caption ?? `Found ${item.name}!`}
         </Text>
 
-        <Image
-          source={{ uri: item.image_url }}
-          style={{ width: "100%", height: 220, borderRadius: 12, marginTop: 10 }}
-          resizeMode="cover"
-        />
+        {/* Tap the photo to view it full-screen */}
+        <Pressable onPress={() => setViewerUri(item.image_url)}>
+          <Image
+            source={{ uri: item.image_url }}
+            style={{ width: "100%", height: 220, borderRadius: 12, marginTop: 10 }}
+            resizeMode="cover"
+          />
+        </Pressable>
 
         <View className="flex-row items-center justify-between mt-3">
           {/* Hidden on your own posts — messaging yourself would show every
@@ -587,8 +693,9 @@ export default function CommunityScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFFFFF" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View className="flex-1">
+      <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFFFFF" }} edges={["top"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <Text
         className="text-xl font-bold text-center mt-4"
@@ -646,6 +753,7 @@ export default function CommunityScreen() {
         {activeTab === "feed" && !isGuest && (
           <View className="px-5 mt-4">
             <View
+              ref={searchBarRef}
               className="flex-row items-center rounded-full px-4"
               style={{ backgroundColor: "#FFFFFF", height: 48 }}
             >
@@ -681,11 +789,30 @@ export default function CommunityScreen() {
         </View>
       ) : activeTab === "feed" ? (
         <FlatList
+          ref={feedRef}
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           className="px-5 mt-4"
           contentContainerStyle={{ paddingBottom: 24 }}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            walkScrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          onLayout={(e) => {
+            walkViewportHRef.current = e.nativeEvent.layout.height;
+          }}
+          onContentSizeChange={(_, h) => {
+            walkContentHRef.current = h;
+          }}
+          onScrollToIndexFailed={(info) => {
+            // Variable-height cards → layout can lag the jump; land near
+            // the target instead of failing silently.
+            feedRef.current?.scrollToOffset({
+              offset: info.averageItemLength * info.index,
+              animated: true,
+            });
+          }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
@@ -698,23 +825,92 @@ export default function CommunityScreen() {
           }
         />
       ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.partnerId}
-          renderItem={renderConversation}
-          className="px-5 mt-4"
-          contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          ListEmptyComponent={
-            <View className="items-center mt-10">
-              <Text style={{ color: "#6b7280" }}>No messages yet.</Text>
-            </View>
-          }
+        <View ref={conversationsRef} style={{ flex: 1 }}>
+          <FlatList
+            ref={messagesListRef}
+            data={conversations}
+            keyExtractor={(item) => item.partnerId}
+            renderItem={renderConversation}
+            className="flex-1 px-5 mt-4"
+            contentContainerStyle={{ paddingBottom: 24 }}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              walkScrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
+            onLayout={(e) => {
+              walkViewportHRef.current = e.nativeEvent.layout.height;
+            }}
+            onContentSizeChange={(_, h) => {
+              walkContentHRef.current = h;
+            }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            ListEmptyComponent={
+              <View className="items-center mt-10">
+                <Text style={{ color: "#6b7280" }}>No messages yet.</Text>
+              </View>
+            }
+          />
+        </View>
+      )}
+
+      {/* Image viewer — tap a feed photo to see it full-screen; tap
+          anywhere or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </View>
+        </Modal>
+      </View>
+      </SafeAreaView>
+
+      {/* First-run coach-mark walkthroughs — sent by the Guide's Go button
+          while the "View Posts" / "Message" rows are unfinished. */}
+      {showWalkthrough && (
+        <CommunityWalkthrough
+          variant={walkthroughVariant}
+          targets={{
+            searchBar: searchBarRef,
+            firstPost: firstPostRef,
+            conversations: conversationsRef,
+          }}
+          scrollYRef={walkScrollYRef}
+          contentHRef={walkContentHRef}
+          viewportHRef={walkViewportHRef}
+          scrollTo={handleWalkthroughScrollTo}
+          onFinish={() => setShowWalkthrough(false)}
         />
       )}
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }

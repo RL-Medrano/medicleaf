@@ -16,6 +16,7 @@ import { router } from "expo-router";
 import Checkbox from "expo-checkbox";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/utils/supabase";
+import { nextRouteAfterSignIn } from "@/utils/pin";
 
 const SAVED_EMAIL_KEY = "medicleaf_saved_email";
 const SAVED_PASSWORD_KEY = "medicleaf_saved_password";
@@ -57,9 +58,9 @@ export default function LoginScreen() {
 
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       if (error.message.includes("Invalid login credentials")) {
         Alert.alert(
           "Couldn't sign in",
@@ -93,7 +94,14 @@ export default function LoginScreen() {
       console.error("[login] failed to save/clear credentials:", err);
     }
 
-    router.replace("/tab/home");
+    // ── Second step: the account's 6-digit PIN ─────────────────────────
+    // The password proved knowledge of the password; the PIN is a second
+    // thing to know, so a leaked password alone isn't enough. A first-time
+    // user has no PIN yet, so they go and make one instead of verifying.
+    const nextRoute = await nextRouteAfterSignIn();
+
+    setLoading(false);
+    router.replace(nextRoute);
   }
 
   function handleForgotPassword() {

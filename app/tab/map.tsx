@@ -207,6 +207,11 @@ export default function MapScreen() {
   async function loadPinnedPosts() {
     setLoading(true);
 
+    // Safety cap: newest 1,000 located posts. With current volume this
+    // returns everything (UI identical — same map, zoom, and pins); it only
+    // stops this query from growing without bound years from now. Region-
+    // based lazy loading would replace this if pins ever number in the
+    // hundreds (see visiblePosts below — filtering stays client-side).
     const { data, error } = await supabase
       .from("posts")
       .select(
@@ -214,7 +219,8 @@ export default function MapScreen() {
       )
       .not("latitude", "is", null)
       .not("longitude", "is", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1000);
 
     if (error) {
       // Don't leave the map silently empty with no clue why (e.g. offline,
@@ -277,6 +283,10 @@ export default function MapScreen() {
   function handleSelectPin(post: PinnedPost) {
     lastPinPressRef.current = Date.now();
 
+    // While navigating, pin taps do nothing — only the Cancel button in
+    // the bottom card can end navigation.
+    if (hasActiveRoute) return;
+
     // Pressing the already-selected pin toggles it back off — same
     // result as tapping anywhere else on the map.
     if (selectedPost?.id === post.id) {
@@ -289,13 +299,15 @@ export default function MapScreen() {
     clearRoute(); // clear any previous route + stop watching when switching pins
   }
 
-  // Tapping anywhere on the map that isn't a pin dismisses the active
-  // pin: the card closes and the pin returns to plain dark green.
+  // Tapping empty map dismisses the selected pin's card — but NEVER while
+  // navigating: a navigating user pans and zooms freely, and only Cancel
+  // ends the route.
   function handleMapPress() {
     // Ignore presses that happen right after a pin was selected — some
     // platforms fire the map's press for the same tap that hit a pin,
     // which would close the card the instant it opens.
     if (Date.now() - lastPinPressRef.current < 350) return;
+    if (hasActiveRoute) return;
     if (!selectedPost) return;
     setSelectedPost(null);
     clearRoute();
@@ -335,10 +347,13 @@ export default function MapScreen() {
 
     setEtaMinutes(minutes);
     setArrivalLabel(
-      new Date(Date.now() + seconds * 1000).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      })
+      new Date(Date.now() + seconds * 1000)
+        .toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+        .replace("AM", "am")
+        .replace("PM", "pm")
     );
   }
 
@@ -647,6 +662,23 @@ export default function MapScreen() {
               style={{ paddingBottom: 12 }}
               contentContainerStyle={{ gap: 8 }}
             >
+              {/* "All Plants" clears every filter — selected when
+                  nothing is filtered, matching the mockup's first chip. */}
+              <Pressable
+                onPress={() => setActiveFilters([])}
+                className="rounded-full"
+                style={{
+                  backgroundColor: showAllPlants ? "#1B4332" : "#FFFFFF",
+                  borderWidth: 1,
+                  borderColor: showAllPlants ? "#1B4332" : "#D1D5DB",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                }}
+              >
+                <Text style={{ color: showAllPlants ? "#FFFFFF" : "#000000" }}>
+                  All Plants
+                </Text>
+              </Pressable>
               {recentSearches.map((name) => {
                 const isActive = activeFilters.includes(name);
                 return (
@@ -726,8 +758,8 @@ export default function MapScreen() {
                 {/* Plant pins — plain dark green (#1B4332) at rest; the
                     selected pin inverts to a WHITE background with a
                     dark-green ring, and stays that way through an active
-                    route too. Tapping the map clears the selection (see
-                    handleMapPress). */}
+                    route too. Empty-map taps clear the selection only
+                    when NOT navigating (see handleMapPress). */}
                 {visiblePosts.map((post) => {
                   const isSelected = selectedPost?.id === post.id;
                   return (
@@ -788,10 +820,10 @@ export default function MapScreen() {
               />
             )}
 
-            {/* Only appears once a manual pan has paused auto-follow
-                during active navigation — tapping it snaps back to the
-                live position and re-enables auto-follow. Top-right so
-                it never collides with the floating bottom card. */}
+            {/* Recenter — only once a manual pan has paused auto-follow
+                during active navigation. Tapping it snaps back to the
+                live position and re-enables auto-follow. Top-left,
+                below the chips row, per the mockup. */}
             {hasActiveRoute && !followingUser && (
               <Pressable
                 onPress={handleRecenter}
@@ -799,10 +831,10 @@ export default function MapScreen() {
                 style={{
                   position: "absolute",
                   top: 16,
-                  right: 16,
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  left: 16,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
                   backgroundColor: "#FFFFFF",
                   alignItems: "center",
                   justifyContent: "center",
@@ -810,15 +842,21 @@ export default function MapScreen() {
                   borderColor: "#D1D5DB",
                 }}
               >
-                <Text style={{ fontSize: 18 }}>⌖</Text>
+                <Image
+                  source={require("@/assets/images/icons/recenter.png")}
+                  style={{ width: 28, height: 28 }}
+                  resizeMode="contain"
+                />
               </Pressable>
             )}
 
             {/* Bottom card — floats OVER the map with margins and
-                rounded corners on all sides, matching the mockup:
-                bigger photo, black plant name, then location +
-                pinned-by on their own row with the directions icon
-                at the right. */}
+                rounded corners on all sides, matching the mockup.
+                Pin view: name + blue View Post button, scientific name,
+                location, then pinned-by with the directions plane icon.
+                Navigation view: same header (no View Post), pinned-by +
+                live ETA with the red Cancel button — Cancel is the ONLY
+                way to end navigation. */}
             {selectedPost && (
               <View
                 style={{
@@ -837,9 +875,37 @@ export default function MapScreen() {
                     style={{ width: 88, height: 80, borderRadius: 12 }}
                   />
                   <View className="ml-4 flex-1">
-                    <Text className="font-bold" style={{ color: "#000000", fontSize: 22 }}>
-                      {selectedPost.name}
-                    </Text>
+                    <View className="flex-row items-center">
+                      <Text
+                        className="font-bold flex-1"
+                        style={{ color: "#000000", fontSize: 22 }}
+                        numberOfLines={1}
+                      >
+                        {selectedPost.name}
+                      </Text>
+                      {!hasActiveRoute && (
+                        <Pressable
+                          onPress={() =>
+                            router.push({
+                              pathname: "/viewpost",
+                              params: { postId: selectedPost.id },
+                            })
+                          }
+                          hitSlop={8}
+                          style={{
+                            backgroundColor: "#2196F3",
+                            borderRadius: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            marginLeft: 8,
+                          }}
+                        >
+                          <Text className="font-semibold" style={{ color: "#FFFFFF", fontSize: 14 }}>
+                            View Post
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
                     {selectedPost.plant_slug &&
                       getPlantDetailsBySlug(selectedPost.plant_slug)?.scientific_name && (
                         <Text
@@ -852,20 +918,25 @@ export default function MapScreen() {
                   </View>
                 </View>
 
-                <View className="flex-row items-center mt-4">
-                  <View className="flex-1">
-                    {selectedPost.location_name && (
-                      <Text style={{ color: "#6B7280", fontSize: 16 }}>
-                        {selectedPost.location_name}
-                      </Text>
-                    )}
-                    <Text style={{ color: "#6B7280", fontSize: 16, marginTop: 2 }}>
+                {selectedPost.location_name && (
+                  <Text style={{ color: "#6B7280", fontSize: 16, marginTop: 12 }}>
+                    {selectedPost.location_name}
+                  </Text>
+                )}
+
+                <View className="flex-row items-center justify-between mt-3">
+                  <View className="flex-1 mr-3">
+                    <Text style={{ color: "#6B7280", fontSize: 16 }}>
                       Pinned by: {selectedPost.profiles?.username ?? "Someone"}
                     </Text>
+                    {hasActiveRoute && (
+                      <Text style={{ color: "#6B7280", fontSize: 16, marginTop: 2 }}>
+                        {etaMinutes !== null ? `${etaMinutes} minutes` : "Calculating..."}
+                        {arrivalLabel ? ` • Arrive ${arrivalLabel}` : ""}
+                      </Text>
+                    )}
                   </View>
 
-                  {/* Swaps: directions button before a route exists,
-                      live ETA + Cancel once it does. */}
                   {!hasActiveRoute ? (
                     <Pressable
                       onPress={handleGetDirections}
@@ -880,15 +951,19 @@ export default function MapScreen() {
                       />
                     </Pressable>
                   ) : (
-                    <View className="flex-row items-center">
-                      <Text style={{ color: "#1B4332", fontSize: 14 }}>
-                        {etaMinutes !== null ? `${etaMinutes} minutes` : "Calculating..."}
-                        {arrivalLabel ? ` • Arrive ${arrivalLabel}` : ""}
+                    <Pressable
+                      onPress={handleCancelRoute}
+                      style={{
+                        backgroundColor: "#DC2626",
+                        borderRadius: 8,
+                        paddingHorizontal: 20,
+                        paddingVertical: 10,
+                      }}
+                    >
+                      <Text className="font-semibold" style={{ color: "#FFFFFF", fontSize: 15 }}>
+                        Cancel
                       </Text>
-                      <Pressable onPress={handleCancelRoute} className="ml-3">
-                        <Text style={{ color: "#DC2626" }}>Cancel</Text>
-                      </Pressable>
-                    </View>
+                    </Pressable>
                   )}
                 </View>
               </View>

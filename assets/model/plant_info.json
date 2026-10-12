@@ -130,8 +130,8 @@
     ]
   },
   "calamansi": {
-    "scientific_name": "Citrus microcarpa",
-    "about": "Calamansi (Citrus microcarpa) is a small citrus fruit valued for its vitamin C content and common use in traditional home remedies. It is often prepared as a diluted drink and is traditionally associated with support for coughs, colds, and general immune health.",
+    "scientific_name": "Citrus × microcarpa",
+    "about": "Calamansi (Citrus × microcarpa) is a small citrus fruit valued for its vitamin C content and common use in traditional home remedies. It is often prepared as a diluted drink and is traditionally associated with support for coughs, colds, and general immune health.",
     "benefits": [
       "Boosts vitamin C intake",
       "Helps relieve cough and colds",
@@ -156,8 +156,8 @@
     ]
   },
   "dayap": {
-    "scientific_name": "Citrus aurantiifolia",
-    "about": "Dayap (Citrus aurantiifolia) is a citrus plant traditionally used in preparations associated with respiratory and digestive support. Its juice provides vitamin C and may be consumed diluted or incorporated into traditional herbal preparations for concerns such as cough and digestive discomfort.",
+    "scientific_name": "Citrus × aurantiifolia",
+    "about": "Dayap (Citrus × aurantiifolia) is a citrus plant traditionally used in preparations associated with respiratory and digestive support. Its juice provides vitamin C and may be consumed diluted or incorporated into traditional herbal preparations for concerns such as cough and digestive discomfort.",
     "benefits": [
       "Helps relieve respiratory discomfort",
       "Supports digestive health",
@@ -507,8 +507,8 @@
     ]
   },
   "yerba-buena": {
-    "scientific_name": "Mentha cordifolia",
-    "about": "Yerba-buena (Mentha cordifolia) is an aromatic medicinal herb commonly used in traditional remedies for headaches, stomach aches, and minor pain. Its leaves may be prepared as tea, chewed fresh, or crushed for external use, making it a familiar household herb for mild discomfort.",
+    "scientific_name": "Mentha × villosa",
+    "about": "Yerba-buena (Mentha × villosa) is an aromatic medicinal herb commonly used in traditional remedies for headaches, stomach aches, and minor pain. Its leaves may be prepared as tea, chewed fresh, or crushed for external use, making it a familiar household herb for mild discomfort.",
     "benefits": [
       "Helps relieve headaches",
       "Soothes stomach aches",

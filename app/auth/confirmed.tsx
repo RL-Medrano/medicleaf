@@ -1,38 +1,40 @@
 // app/auth/confirmed.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import * as Linking from "expo-linking";
+import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
+import { nextRouteAfterSignIn } from "@/utils/pin";
 
 export default function ConfirmedScreen() {
+  // Read ?code= off the route itself rather than Linking.getInitialURL().
+  // getInitialURL() only reports the URL that LAUNCHED the app — so when
+  // MedicLeaf is already sitting in memory (the normal case here, since
+  // they just signed up on this very device) it comes back null and the
+  // exchange never runs. expo-router supplies the params for warm and cold
+  // starts alike, which is how changepassword.tsx already does it.
+  const params = useLocalSearchParams<{ code?: string }>();
+
   const [status, setStatus] = useState<"working" | "success" | "error">("working");
   const [errorMsg, setErrorMsg] = useState("");
+  // The code is single-use — make sure a re-render can't burn it twice.
+  const exchangedRef = useRef(false);
 
   useEffect(() => {
-    handleIncomingLink();
-  }, []);
+    if (exchangedRef.current) return;
 
-  async function handleIncomingLink() {
+    if (!params.code) {
+      setStatus("error");
+      setErrorMsg("This confirmation link is invalid or has already been used.");
+      return;
+    }
+
+    exchangedRef.current = true;
+    exchangeCode(params.code);
+  }, [params.code]);
+
+  async function exchangeCode(code: string) {
     try {
-      const url = await Linking.getInitialURL();
-      if (!url) {
-        setStatus("error");
-        setErrorMsg("No confirmation data found.");
-        return;
-      }
-
-      // PKCE flow — Supabase appends ?code=... to the redirect URL.
-      const queryPart = url.split("?")[1]?.split("#")[0];
-      const code = queryPart ? new URLSearchParams(queryPart).get("code") : null;
-
-      if (!code) {
-        setStatus("error");
-        setErrorMsg("This confirmation link is invalid or has already been used.");
-        return;
-      }
-
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) throw error;
 
@@ -48,8 +50,10 @@ export default function ConfirmedScreen() {
     router.replace("/auth/login");
   }
 
-  function goToHome() {
-    router.replace("/tab/home");
+  async function goToHome() {
+    // A freshly confirmed sign-up has no PIN yet, so this opens the create
+    // screen instead of dropping a brand-new account into Home.
+    router.replace(await nextRouteAfterSignIn());
   }
 
   return (

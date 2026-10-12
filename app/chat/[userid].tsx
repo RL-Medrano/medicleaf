@@ -19,6 +19,7 @@ import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/utils/supabase";
 import { uploadToCloudinary } from "@/utils/cloudinary";
 import { checkIsOnline } from "@/utils/network";
+import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 type Message = {
@@ -27,18 +28,35 @@ type Message = {
   receiver_id: string;
   content: string | null;
   image_url: string | null;
+  post_id: string | null;
   is_read: boolean;
   created_at: string;
   hidden_for_sender?: boolean;
   hidden_for_receiver?: boolean;
 };
 
+// A post being inquired about — shown as the green card from the mockup,
+// both as the context header (before anything is sent) and attached to
+// the first message (so the owner sees it too, permanently).
+type InquiredPost = {
+  id: string;
+  name: string;
+  plant_slug: string | null;
+  caption: string | null;
+  image_url: string;
+  created_at: string;
+  profiles: { username: string; avatar_url: string | null } | null;
+};
+
+const INQUIRED_POST_COLUMNS =
+  "id, name, plant_slug, caption, image_url, created_at, profiles(username, avatar_url)";
+
 // Minimum time between sent messages, to keep someone from spamming the
 // thread with a burst of one-word messages or images.
 const SEND_COOLDOWN_MS = 800;
 
 const MESSAGE_COLUMNS =
-  "id, sender_id, receiver_id, content, image_url, is_read, created_at";
+  "id, sender_id, receiver_id, content, image_url, post_id, is_read, created_at";
 
 // "10:24 PM" — the timestamp format used in the mockup.
 function formatTime(iso: string): string {
@@ -49,9 +67,10 @@ function formatTime(iso: string): string {
 }
 
 export default function ChatScreen() {
-  const { userid: partnerId, username } = useLocalSearchParams<{
+  const { userid: partnerId, username, postId: inquiredPostId } = useLocalSearchParams<{
     userid: string;
     username: string;
+    postId?: string;
   }>();
 
   const [myId, setMyId] = useState<string | null>(null);
@@ -71,6 +90,13 @@ export default function ChatScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const bubbleMaxWidth = Math.round(windowWidth * 0.78);
 
+  // The post this chat was opened from via a post's "Send Message"
+  // (param). Shown as the context card until the inquiry is sent.
+  const [inquiredPost, setInquiredPost] = useState<InquiredPost | null>(null);
+  // Posts attached to messages (post_id), keyed by post id — lets the
+  // card render on old messages and on the owner's side too.
+  const [postCache, setPostCache] = useState<Record<string, InquiredPost>>({});
+
   // The other person's real profile photo — shown next to their
   // messages instead of a static placeholder icon. Null until loaded,
   // or if they don't have one set (renderMessage falls back to
@@ -78,11 +104,18 @@ export default function ChatScreen() {
   const [partnerAvatarUrl, setPartnerAvatarUrl] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Mirror of postCache for async helpers (avoids stale-closure reads).
+  const postCacheRef = useRef<Record<string, InquiredPost>>({});
   // True only while this screen is focused. init() is async, so it can
   // reach the realtime subscribe long after the focus cleanup has run.
   const focusedRef = useRef(false);
   const listRef = useRef<FlatList<Message>>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One-shot guard: the post card auto-sends once per screen mount. Each
+  // press of "Send Message" pushes a FRESH chat screen (new guard), so the
+  // same post can be sent again and again — while a refocus of the current
+  // screen (init re-runs) never duplicates it.
+  const autoSendTriedRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -101,12 +134,28 @@ export default function ChatScreen() {
     }, [partnerId])
   );
 
+  // Opening a chat via a post's "Send Message" auto-sends the post card
+  // as the first message. That's what the mockup shows (the card sits in
+  // the thread with its own timestamp), and it's also what makes the
+  // conversation appear in Community → Messages — that list is built
+  // purely from `messages` rows, and opening a chat alone writes none.
+  // Runs after init() finishes (loading false, thread + post loaded).
+  // Deliberately NO "thread already has a card" check: pressing Send
+  // Message on the same post again sends the post again.
+  useEffect(() => {
+    if (loading || !myId || !inquiredPost || autoSendTriedRef.current) return;
+    autoSendTriedRef.current = true;
+    sendMessage(null, undefined, inquiredPost.id);
+  }, [loading, myId, inquiredPost]);
+
   async function init() {
     setLoading(true);
 
+    // Local session read — same user object, no Auth-server round-trip.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     // A post's "Send Message" is hidden on the user's own posts, but guard
     // here too — messaging yourself would make every sent message also
@@ -125,8 +174,45 @@ export default function ChatScreen() {
     await loadMessages(user.id, partnerId);
     await markAsRead(user.id, partnerId);
     await loadPartnerAvatar(partnerId);
+    // Post context when opened from a post's "Send Message" — the card
+    // the owner will recognise the inquiry by.
+    if (inquiredPostId) {
+      await loadInquiredPost(inquiredPostId);
+    }
 
     setLoading(false);
+  }
+
+  async function loadInquiredPost(postId: string) {
+    const { data } = await supabase
+      .from("posts")
+      .select(INQUIRED_POST_COLUMNS)
+      .eq("id", postId)
+      .maybeSingle();
+    if (data) {
+      const post = data as unknown as InquiredPost;
+      setInquiredPost(post);
+      postCacheRef.current[post.id] = post;
+      setPostCache({ ...postCacheRef.current });
+    }
+  }
+
+  // Fetches any not-yet-cached posts referenced by thread messages so
+  // their cards can render (old inquiries, owner's side, realtime).
+  async function cachePosts(postIds: string[]) {
+    const missing = [...new Set(postIds)].filter((id) => !(id in postCacheRef.current));
+    if (missing.length === 0) return;
+    const { data } = await supabase
+      .from("posts")
+      .select(INQUIRED_POST_COLUMNS)
+      .in("id", missing);
+    if (data) {
+      const posts = data as unknown as InquiredPost[];
+      posts.forEach((p) => {
+        postCacheRef.current[p.id] = p;
+      });
+      setPostCache({ ...postCacheRef.current });
+    }
   }
 
   async function loadPartnerAvatar(otherUserId: string) {
@@ -155,6 +241,11 @@ export default function ChatScreen() {
         m.sender_id === currentUserId ? !m.hidden_for_sender : !m.hidden_for_receiver
       );
       setMessages(visible);
+      // Warm the post-card cache for any inquiry messages in the thread.
+      const referenced = visible
+        .map((m) => m.post_id)
+        .filter((id): id is string => !!id);
+      if (referenced.length > 0) void cachePosts(referenced);
     }
   }
 
@@ -217,6 +308,8 @@ export default function ChatScreen() {
             if (prev.some((m) => m.id === incoming.id)) return prev; // already have it
             return [...prev, incoming];
           });
+          // A live inquiry carries its post card — cache it to render.
+          if (incoming.post_id) void cachePosts([incoming.post_id]);
           markAsRead(currentUserId, otherUserId);
 
           setTimeout(() => {
@@ -265,9 +358,15 @@ export default function ChatScreen() {
    * optional caption). `localImageUri` is only used for the optimistic
    * bubble — the real, stored image is whatever Cloudinary returns.
    */
-  async function sendMessage(content: string | null, localImageUri?: string) {
+  async function sendMessage(
+    content: string | null,
+    localImageUri?: string,
+    attachedPostId?: string | null
+  ) {
     if (!myId || !partnerId || sending || cooldown) return;
-    if (!content && !localImageUri) return;
+    // Allow a card-only message (no text, no photo): the auto-sent post
+    // inquiry from "Send Message" is content=null with just post_id set.
+    if (!content && !localImageUri && !attachedPostId) return;
 
     const online = await checkIsOnline();
     if (!online) {
@@ -288,6 +387,7 @@ export default function ChatScreen() {
       receiver_id: partnerId,
       content,
       image_url: localImageUri ?? null,
+      post_id: attachedPostId ?? null,
       is_read: false,
       created_at: new Date().toISOString(),
     };
@@ -309,6 +409,7 @@ export default function ChatScreen() {
           receiver_id: partnerId,
           content,
           image_url: imageUrl,
+          post_id: attachedPostId ?? null,
         })
         .select(MESSAGE_COLUMNS)
         .single();
@@ -333,7 +434,12 @@ export default function ChatScreen() {
   function handleSend() {
     const content = draft.trim();
     if (!content) return;
-    sendMessage(content);
+    // First message after opening from "Send Message" carries the post —
+    // that's the card the owner recognises the inquiry by. Later messages
+    // (or threads that already reference a post) send plain.
+    const attachPostId =
+      inquiredPost && !messages.some((m) => m.post_id) ? inquiredPost.id : null;
+    sendMessage(content, undefined, attachPostId);
   }
 
   async function handlePickImage() {
@@ -355,9 +461,130 @@ export default function ChatScreen() {
 
     if (result.canceled || !result.assets?.[0]?.uri) return;
 
-    // Any caption already typed goes along with the photo.
+    // Any caption already typed goes along with the photo. Same
+    // post-attach rule as text (see handleSend).
     const caption = draft.trim() || null;
-    sendMessage(caption, result.assets[0].uri);
+    const attachPostId =
+      inquiredPost && !messages.some((m) => m.post_id) ? inquiredPost.id : null;
+    sendMessage(caption, result.assets[0].uri, attachPostId);
+  }
+
+  // Tapping a post card — either side of the conversation — jumps to
+  // where the post lives: the Community News Feed, which scrolls to the
+  // post and briefly highlights it (?focusPost).
+  function openPostInFeed(postId: string) {
+    router.navigate({
+      pathname: "/tab/community",
+      params: { tab: "feed", focusPost: postId },
+    } as any);
+  }
+
+  function formatPostDateTime(createdAt: string) {
+    const date = new Date(createdAt);
+    return {
+      dateStr: date.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+      timeStr: date
+        .toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+        .toLowerCase(),
+    };
+  }
+
+  // Green post card from the mockup: bright-green outer bubble, white
+  // inner card with poster, date/time, plant, caption, and photo.
+  //
+  // The card gets an EXPLICIT width (not just maxWidth): sizing it from
+  // its own content while the photo inside is width:"100%" of that same
+  // content is a circular constraint — on some devices it collapsed the
+  // text column to nothing and rendered a blank white box.
+  function renderPostCard(post: InquiredPost, cardWidth: number, mine: boolean) {
+    const { dateStr, timeStr } = formatPostDateTime(post.created_at);
+    const scientific = post.plant_slug
+      ? getPlantDetailsBySlug(post.plant_slug)?.scientific_name
+      : null;
+    return (
+      <Pressable
+        onPress={() => openPostInFeed(post.id)}
+        style={{
+          width: cardWidth,
+          borderRadius: 18,
+          // Mockup: MY card has a square bottom-right corner (the sent
+          // bubble's "tail"); a received card mirrors it with a square
+          // bottom-left corner, pointing at the avatar side.
+          borderBottomRightRadius: mine ? 0 : 18,
+          borderBottomLeftRadius: mine ? 18 : 0,
+          backgroundColor: "#2BB24C",
+          padding: 10,
+        }}
+      >
+        <View
+          style={{
+            borderRadius: 12,
+            backgroundColor: "#FFFFFF",
+            padding: 14,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Image
+              source={
+                post.profiles?.avatar_url
+                  ? { uri: post.profiles.avatar_url }
+                  : require("@/assets/images/icons/place_holder.png")
+              }
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: "#E5E7EB",
+              }}
+              resizeMode="cover"
+            />
+            <View style={{ marginLeft: 12, flex: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{ fontWeight: "bold", color: "#1A1A1A", fontSize: 15 }}
+              >
+                {post.profiles?.username ?? "Someone"}
+              </Text>
+              <Text style={{ color: "#6B7280", fontSize: 12, lineHeight: 16 }}>
+                Date: {dateStr}
+              </Text>
+              <Text style={{ color: "#6B7280", fontSize: 12, lineHeight: 16 }}>
+                Time: {timeStr}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{ color: "#6B7280", fontSize: 12, lineHeight: 16 }}
+              >
+                {post.name}
+                {scientific ? `(${scientific})` : ""}
+              </Text>
+            </View>
+          </View>
+          <Text style={{ color: "#1A1A1A", fontSize: 15, lineHeight: 20, marginTop: 10 }}>
+            {post.caption ?? `Found ${post.name}!`}
+          </Text>
+          <Image
+            source={{ uri: post.image_url }}
+            style={{
+              width: "100%",
+              height: 110,
+              borderRadius: 10,
+              marginTop: 10,
+              backgroundColor: "#F3F4F6",
+            }}
+            resizeMode="cover"
+          />
+        </View>
+      </Pressable>
+    );
   }
 
   function renderMessage({ item }: { item: Message }) {
@@ -366,11 +593,20 @@ export default function ChatScreen() {
     // 78% of the screen; received messages also clear the avatar gutter.
     const maxBubble = bubbleMaxWidth - (isMine ? 0 : 48);
 
+    // Inquiry card, when this message references a post (and its details
+    // have loaded) — renders above the message's own bubble.
+    const attachedPost = item.post_id ? postCache[item.post_id] ?? null : null;
+
     const bubble = (
       <View
         className="overflow-hidden"
         style={{
           borderRadius: 16,
+          // Same shape rule as the post card: sent bubbles end in a
+          // square bottom-right corner, received ones mirror it with a
+          // square bottom-left corner (the mockup's white reply bubble).
+          borderBottomRightRadius: isMine ? 0 : 16,
+          borderBottomLeftRadius: isMine ? 16 : 0,
           backgroundColor: isMine ? "#2BB24C" : "#FFFFFF",
           maxWidth: maxBubble,
         }}
@@ -416,7 +652,10 @@ export default function ChatScreen() {
     if (isMine) {
       return (
         <View style={{ alignItems: "flex-end", marginBottom: 16 }}>
-          {bubble}
+          {attachedPost && renderPostCard(attachedPost, maxBubble, true)}
+          {(item.content || item.image_url) && (
+            <View style={{ marginTop: attachedPost ? 8 : 0 }}>{bubble}</View>
+          )}
           <View
             style={{
               flexDirection: "row",
@@ -451,8 +690,11 @@ export default function ChatScreen() {
           }}
           resizeMode="cover"
         />
-        <View>
-          {bubble}
+        <View style={{ alignItems: "flex-start" }}>
+          {attachedPost && renderPostCard(attachedPost, maxBubble, false)}
+          {(item.content || item.image_url) && (
+            <View style={{ marginTop: attachedPost ? 8 : 0 }}>{bubble}</View>
+          )}
           <View
             style={{
               flexDirection: "row",
@@ -472,6 +714,11 @@ export default function ChatScreen() {
 
   const sendDisabled = !draft.trim() || sending || cooldown;
   const imageButtonDisabled = sending || cooldown;
+
+  // Context card: the post this chat was opened from, shown until the
+  // inquiry itself (carrying the same card) is sent.
+  const showContextCard =
+    !!inquiredPost && !messages.some((m) => m.post_id);
 
   const insets = useSafeAreaInsets();
 
@@ -527,18 +774,31 @@ export default function ChatScreen() {
             <ActivityIndicator color="#1B4332" />
           </View>
         ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            className="flex-1 px-4"
-            contentContainerStyle={{ paddingVertical: 16 }}
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() =>
-              listRef.current?.scrollToEnd({ animated: false })
-            }
-          />
+          <>
+            {showContextCard && inquiredPost && (
+              <View
+                style={{
+                  alignItems: "flex-end",
+                  paddingHorizontal: 16,
+                  paddingTop: 16,
+                }}
+              >
+                {renderPostCard(inquiredPost, bubbleMaxWidth, true)}
+              </View>
+            )}
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              className="flex-1 px-4"
+              contentContainerStyle={{ paddingVertical: 16 }}
+              keyboardShouldPersistTaps="handled"
+              onContentSizeChange={() =>
+                listRef.current?.scrollToEnd({ animated: false })
+              }
+            />
+          </>
         )}
 
         {/* Composer */}
@@ -550,15 +810,17 @@ export default function ChatScreen() {
             paddingBottom: 10 + insets.bottom,
           }}
         >
-          <View className="flex-row items-center">
+          <View className="flex-row items-end">
             <View
-              className="flex-1 flex-row items-center"
+              className="flex-1 flex-row items-end"
               style={{
                 backgroundColor: "#EDEDED",
-                borderRadius: 999,
-                height: 48,
+                borderRadius: 24,
+                minHeight: 48,
+                maxHeight: 128,
                 paddingLeft: 18,
                 paddingRight: 12,
+                paddingVertical: 6,
               }}
             >
               <TextInput
@@ -566,7 +828,16 @@ export default function ChatScreen() {
                 onChangeText={setDraft}
                 placeholder="Type a message....."
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, color: "#1A1A1A", fontSize: 15 }}
+                multiline
+                textAlignVertical="top"
+                style={{
+                  flex: 1,
+                  color: "#1A1A1A",
+                  fontSize: 15,
+                  lineHeight: 21,
+                  maxHeight: 116,
+                  paddingVertical: 8,
+                }}
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
               />
@@ -630,7 +901,7 @@ export default function ChatScreen() {
           >
             <Image
               source={require("@/assets/images/icons/close.png")}
-              style={{ width: 28, height: 28, tintColor: "#FFFFFF" }}
+              style={{ width: 28, height: 28 }}
               resizeMode="contain"
             />
           </Pressable>

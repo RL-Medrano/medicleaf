@@ -6,12 +6,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
 import { isLocalGuest } from "@/utils/guest";
+import { isPinVerified, clearPinVerified } from "@/utils/pin";
 
 // How long the finished splash stays on screen before navigating.
 const HOLD_AFTER_ANIMATION_MS = 600;
 // Max time to wait for the server session check before giving up and
 // trusting the local session (slow connections shouldn't freeze the splash).
 const SESSION_CHECK_TIMEOUT_MS = 4000;
+// Absolute backstop for the whole splash. Every await in
+// resolveDestination() is individually bounded, but if some layer still
+// stalls the app must never be able to sit here forever — an offline
+// token refresh is the usual culprit.
+const SPLASH_DEADLINE_MS = 8000;
 
 /**
  * Decides where the user should go. Runs while the animation plays, so the
@@ -30,11 +36,24 @@ async function resolveDestination(): Promise<Href> {
     if (!hasSeenGetStarted) return "/get_started";
 
     // Step 3: both intro steps are done — route based on session.
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    //
+    // Bounded on purpose. getSession() is not a pure local read: it runs
+    // _recoverAndRefresh(), and with autoRefreshToken on it will attempt a
+    // REAL network refresh of an expired stored session. Access tokens last
+    // about an hour, so after any real gap that refresh fires — and with no
+    // connection it stalls in DNS/connectivity timeouts instead of failing
+    // fast, which used to freeze this screen indefinitely.
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), SESSION_CHECK_TIMEOUT_MS)),
+    ]);
+    const session = sessionResult?.data?.session ?? null;
+
     if (!session) {
       // A local guest has no session, only the flag saved on this device.
+      // Also reached if the read above timed out: sending a signed-in user
+      // back to Welcome is recoverable (they just sign in), whereas an
+      // unbounded wait here is not.
       return (await isLocalGuest()) ? "/tab/home" : "/welcome";
     }
 
@@ -52,6 +71,9 @@ async function resolveDestination(): Promise<Href> {
 
         if (result && result.error && [401, 403, 404].includes(result.error.status ?? 0)) {
           await supabase.auth.signOut({ scope: "local" });
+          // Session is gone, so the "PIN already entered" flag must go with
+          // it — otherwise the next sign-in on this device could skip re-checking.
+          await clearPinVerified();
           return "/welcome";
         }
 
@@ -71,6 +93,15 @@ async function resolveDestination(): Promise<Href> {
       }
     } catch (err) {
       console.error("[splash] session check failed, keeping local session:", err);
+    }
+
+    // A signed-in member still owes THIS app session their PIN. Reopening
+    // the app while parked on the PIN screen must not drop them into Home
+    // with the step skipped. Guests and anonymous test accounts have no
+    // PIN, so they're excluded.
+    if (!session.user.is_anonymous) {
+      const pinVerified = await isPinVerified(session.user.id);
+      if (!pinVerified) return "/auth/verifypin";
     }
 
     return "/tab/home";
@@ -97,6 +128,13 @@ export default function SplashScreen() {
     // animation, instead of waiting for a fixed delay afterwards.
     const destination = resolveDestination();
 
+    // Backstop around the whole thing. The splash plays for ~1.5s anyway,
+    // so this only ever fires when something above has genuinely stalled.
+    const safeDestination: Promise<Href> = Promise.race([
+      destination,
+      new Promise<Href>((resolve) => setTimeout(() => resolve("/welcome"), SPLASH_DEADLINE_MS)),
+    ]);
+
     const animation = Animated.sequence([
       Animated.parallel([
         Animated.spring(logoScale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
@@ -113,7 +151,7 @@ export default function SplashScreen() {
 
       // Short hold so the finished splash is visible, then navigate.
       timer = setTimeout(async () => {
-        const path = await destination;
+        const path = await safeDestination;
         if (!cancelled) router.replace(path);
       }, HOLD_AFTER_ANIMATION_MS);
     });

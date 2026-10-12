@@ -1,9 +1,16 @@
 /**
  * app/createpost.tsx
  *
- * The map itself lives in components/PinMap.tsx (shared with Edit Post) —
- * single tap drops the pin, double tap opens it full screen. This screen
- * only owns the pin state, the reverse geocode of that pin, and posting.
+ * The map lives in components/PinMap.tsx (shared with Edit Post) and is
+ * VIEW-ONLY here: it shows the photo's own location — the capture-time GPS
+ * fix for a camera shot, the EXIF GPS for a gallery upload — which travels
+ * with the scan through router params (falling back to the latitude /
+ * longitude stored on the scans row). Double-tap opens it full screen;
+ * there is no dropping or moving the pin.
+ *
+ * The caption is the only thing the user can change. The device's current
+ * position is never used: pinning "wherever the user is now" would put a
+ * photo taken somewhere else days ago on the wrong spot entirely.
  *
  * No API key needed — MapLibre is fully open-source, Geoapify tiles are
  * supplied via RasterSource using the URL template from utils/geoapify.ts.
@@ -17,19 +24,18 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
-  Switch,
   Alert,
   ActivityIndicator,
   BackHandler,
   Modal,
   StyleSheet,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import * as Location from "expo-location";
 import { supabase } from "@/utils/supabase";
 import { reverseGeocode } from "@/utils/geoapify";
 import { markTutorialStep } from "@/utils/tutorial";
+import { coordsFromParams } from "@/utils/photoLocation";
 import PinMap from "@/components/PinMap";
 
 type ScanForPost = {
@@ -37,50 +43,44 @@ type ScanForPost = {
   name: string;
   image_url: string;
   image_public_id: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type Coordinates = { latitude: number; longitude: number };
 
 export default function CreatePostScreen() {
-  const { scanId } = useLocalSearchParams<{ scanId: string }>();
+  const { scanId, photoLat, photoLng } = useLocalSearchParams<{
+    scanId: string;
+    photoLat?: string;
+    photoLng?: string;
+  }>();
 
   const [scan, setScan] = useState<ScanForPost | null>(null);
   const [caption, setCaption] = useState("");
-  const [locationEnabled, setLocationEnabled] = useState(true);
   const [pin, setPin] = useState<Coordinates | null>(null);
   const [locationName, setLocationName] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [posting, setPosting] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [pinPicked, setPinPicked] = useState(false);
-  const [pinToggleTouched, setPinToggleTouched] = useState(false);
+  // Full-screen viewer — tapping the scan preview opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
-  // Has the user actually put work on this screen? A caption they typed, a
-  // pin they dropped on the map themselves, or a flip of the Pin Location
-  // switch. (The GPS pin is filled in automatically when the screen opens,
-  // so on its own it is not "unsaved work".)
-  const dirty = caption.trim().length > 0 || pinPicked || pinToggleTouched;
+  // The caption is the only editable field on this screen, so it's the
+  // only thing that can make this draft dirty.
+  const dirty = caption.trim().length > 0;
 
-  // Monotonic id for "the location the label belongs to". Every GPS fix and
-  // every map tap bumps it, and a geocode result is only applied if it is
-  // still the newest one — so a slow response can never overwrite the label
-  // of a pin that was moved afterwards (which used to save a location_name
-  // that didn't match the stored latitude/longitude).
+  // Monotonic id for "the location the label belongs to". Every geocode
+  // bumps it, and a result is only applied if it is still the newest one —
+  // so a slow response can never leave a stale name next to a different
+  // pin (which would save a location_name that doesn't match the stored
+  // latitude/longitude).
   const locationSeq = useRef(0);
 
   useEffect(() => {
     loadScan();
   }, [scanId]);
-
-  useEffect(() => {
-    if (locationEnabled && !pin) {
-      useCurrentLocation();
-    }
-    // Toggling off doesn't clear the pin from state — just stops it from
-    // being sent on Post. Toggling back on re-shows the same pin instead
-    // of re-fetching GPS every time.
-  }, [locationEnabled]);
 
   // The hardware back button must ask before discarding the draft, exactly
   // like the header back button. Confirmation Modals intercept back
@@ -104,9 +104,11 @@ export default function CreatePostScreen() {
   async function loadScan() {
     if (!scanId) return;
 
+    // "*" rather than a column list so a scan saved before the
+    // latitude/longitude columns exist on `scans` can't fail this read.
     const { data, error } = await supabase
       .from("scans")
-      .select("id, name, image_url, image_public_id")
+      .select("*")
       .eq("id", scanId)
       .maybeSingle();
 
@@ -117,41 +119,20 @@ export default function CreatePostScreen() {
     }
 
     setScan(data);
-  }
 
-  async function useCurrentLocation() {
-    // Claim priority up front: if the user taps the map while GPS is still
-    // resolving, their pin wins and this stale fix is dropped.
-    const seq = ++locationSeq.current;
-    setLocating(true);
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+    // The pin is the PHOTO's location — never the device's current one.
+    // Fresh scans pass theirs through router params; a scan reopened from
+    // History falls back to whatever was stored on the row when saved.
+    const coords =
+      coordsFromParams(photoLat, photoLng) ??
+      coordsFromParams(
+        data.latitude == null ? null : String(data.latitude),
+        data.longitude == null ? null : String(data.longitude)
+      );
 
-      if (!permission.granted) {
-        Alert.alert(
-          "Location permission needed",
-          "Allow location access to auto-pin where you found this plant, or turn off Pin Location to post without one."
-        );
-        setLocationEnabled(false);
-        return;
-      }
-
-      const position = await Location.getCurrentPositionAsync({});
-
-      if (seq !== locationSeq.current) return; // superseded by a map tap
-
-      const coords = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
+    if (coords) {
       setPin(coords);
-
-      await resolveLocationName(coords);
-    } catch (err) {
-      console.error("[createpost] location failed:", err);
-      Alert.alert("Couldn't get your location", "You can still tap the map to pin a spot manually.");
-    } finally {
-      setLocating(false);
+      resolveLocationName(coords);
     }
   }
 
@@ -178,15 +159,6 @@ export default function CreatePostScreen() {
     }
   }
 
-  // PinMap hands us the tapped coordinate already unwrapped from the
-  // native event — we only care about storing it and naming it.
-  async function handlePinChange(coords: Coordinates) {
-    setPinPicked(true); // a pin the user chose counts as unsaved work
-    setPin(coords);
-
-    await resolveLocationName(coords);
-  }
-
   // Leaving is only allowed straight away when nothing is pending —
   // otherwise the confirmation popup gets the final say.
   function handleBack() {
@@ -200,16 +172,23 @@ export default function CreatePostScreen() {
 
     // Never save a pin while its label is still being resolved — the
     // location_name must always match the latitude/longitude stored with it.
-    if (locationEnabled && (locating || geocoding)) {
-      Alert.alert("Getting your location", "Hang on a moment while we name this spot, then tap Post again.");
+    if (pin && geocoding) {
+      Alert.alert(
+        "Naming this spot",
+        "Hang on a moment while we name this location, then tap Post again."
+      );
       return;
     }
 
     setPosting(true);
     try {
+      // Local session read — the insert below is still RLS-enforced, so a
+      // dead token fails there with a clear error instead of costing an
+      // Auth-server call up front.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
 
       if (!user) {
         Alert.alert("Please log in", "You need an account to post.");
@@ -223,9 +202,11 @@ export default function CreatePostScreen() {
         caption: caption.trim() || null,
         image_url: scan.image_url,
         image_public_id: scan.image_public_id,
-        latitude: locationEnabled && pin ? pin.latitude : null,
-        longitude: locationEnabled && pin ? pin.longitude : null,
-        location_name: locationEnabled ? locationName : null,
+        // The photo's own spot, fixed at capture/pick time. Null only when
+        // the photo carried no location at all (camera with GPS off).
+        latitude: pin ? pin.latitude : null,
+        longitude: pin ? pin.longitude : null,
+        location_name: pin ? locationName : null,
       });
 
       if (error) throw error;
@@ -250,9 +231,6 @@ export default function CreatePostScreen() {
     );
   }
 
-  // True while the pin's label is still being resolved (GPS or map tap).
-  const locationBusy = locationEnabled && (locating || geocoding);
-
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
@@ -266,18 +244,23 @@ export default function CreatePostScreen() {
               resizeMode="contain"
             />
           </Pressable>
-          <Text className="text-xl font-bold ml-4" style={{ color: "#1B4332" }}>
+          <Text
+            className="flex-1 text-center text-xl font-bold"
+            style={{ color: "#1B4332", marginRight: 24 }}
+          >
             Create Post
           </Text>
         </View>
 
         <View className="rounded-2xl p-4 mt-4" style={{ backgroundColor: "#FFFFFF" }}>
-          {/* Scan preview */}
+          {/* Scan preview — tap to view full-screen */}
           <View className="flex-row items-center">
-            <Image
-              source={{ uri: scan.image_url }}
-              style={{ width: 64, height: 64, borderRadius: 12 }}
-            />
+            <Pressable onPress={() => setViewerUri(scan.image_url)}>
+              <Image
+                source={{ uri: scan.image_url }}
+                style={{ width: 64, height: 64, borderRadius: 12 }}
+              />
+            </Pressable>
             <Text className="font-bold ml-3" style={{ color: "#1B4332" }}>
               {scan.name}
             </Text>
@@ -302,47 +285,20 @@ export default function CreatePostScreen() {
             }}
           />
 
-          {/* Location toggle */}
-          <View className="flex-row items-center justify-between mt-4 mb-2">
-            <Text className="font-semibold" style={{ color: "#1B4332" }}>
-              Where did you find it?
-            </Text>
-            <Switch
-              value={locationEnabled}
-              onValueChange={(value) => {
-                setPinToggleTouched(true); // the user's own choice — count it
-                setLocationEnabled(value);
-              }}
-              trackColor={{ false: "#d1d5db", true: "#95D5B2" }}
-              thumbColor={locationEnabled ? "#1B4332" : "#f4f3f4"}
-            />
-          </View>
+          {/* Location — the photo's own spot, read-only */}
+          <Text className="font-semibold mt-4 mb-2" style={{ color: "#1B4332" }}>
+            Where did you find it?
+          </Text>
 
-          {locationEnabled ? (
+          {pin ? (
             <>
               <Text className="text-xs mb-2" style={{ color: "#6b7280" }}>
-                Tap to drop the pin · Double-tap to view the map full screen
+                Double-tap to view the map full screen
               </Text>
 
-              <PinMap
-                coord={pin}
-                onPinChange={handlePinChange}
-                zoom={14}
-                height={220}
-                borderRadius={16}
-                overlay={
-                  locating ? (
-                    <View
-                      className="absolute inset-0 items-center justify-center"
-                      style={{ backgroundColor: "rgba(255,255,255,0.6)" }}
-                    >
-                      <ActivityIndicator color="#1B4332" />
-                    </View>
-                  ) : null
-                }
-              />
+              <PinMap coord={pin} zoom={14} height={220} borderRadius={16} />
 
-              {locationName && (
+              {locationName ? (
                 <View className="flex-row items-center mt-2">
                   <Image
                     source={require("@/assets/images/icons/pin.png")}
@@ -353,23 +309,30 @@ export default function CreatePostScreen() {
                     {locationName}
                   </Text>
                 </View>
-              )}
+              ) : geocoding ? (
+                <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                  Naming this spot...
+                </Text>
+              ) : null}
             </>
           ) : (
             <Text className="text-xs" style={{ color: "#6b7280" }}>
-              This post won't include a location.
+              This photo doesn't have a location, so the post will be shared without one.
             </Text>
           )}
 
           {/* Post */}
           <Pressable
             onPress={handlePost}
-            disabled={posting || locationBusy}
+            disabled={posting || (pin && geocoding)}
             className="rounded-full py-3 items-center mt-6"
-            style={{ backgroundColor: "#1B4332", opacity: posting || locationBusy ? 0.6 : 1 }}
+            style={{
+              backgroundColor: "#1B4332",
+              opacity: posting || (pin && geocoding) ? 0.6 : 1,
+            }}
           >
             <Text className="text-white font-bold">
-              {posting ? "Posting..." : locationBusy ? "Finding location..." : "Post"}
+              {posting ? "Posting..." : pin && geocoding ? "Naming this spot..." : "Post"}
             </Text>
           </Pressable>
         </View>
@@ -409,6 +372,43 @@ export default function CreatePostScreen() {
               <Text style={styles.disregardText}>Disregard changes</Text>
             </Pressable>
           </View>
+        </View>
+      </Modal>
+
+      {/* Image viewer — tap the preview to see it full-screen; tap
+          anywhere or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
         </View>
       </Modal>
     </SafeAreaView>

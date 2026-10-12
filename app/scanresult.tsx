@@ -3,19 +3,28 @@ import {
   View,
   Text,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StatusBar,
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
 import { uploadToCloudinary } from "@/utils/cloudinary";
 import { checkIsOnline } from "@/utils/network";
 import { getAuthState } from "@/utils/guest";
+import * as Location from "expo-location";
 import { getPlantDetailsBySlug, getDisplayName, PlantDetails } from "@/utils/plantClassifier";
+import { invalidateScanHistory } from "@/utils/scanHistory";
+import {
+  type PhotoCoords,
+  coordsFromParams,
+  coordsToParams,
+  getCaptureLocation,
+} from "@/utils/photoLocation";
 
 export default function ScanResultScreen() {
   const params = useLocalSearchParams<{
@@ -25,6 +34,11 @@ export default function ScanResultScreen() {
     accuracy?: string;
     date?: string;
     time?: string;
+    // Where the photo came from and its capture-time location:
+    imageSource?: string; // "camera" | "library"
+    locationDenied?: string; // "1" when the user refused location permission
+    photoLat?: string;
+    photoLng?: string;
     // Reopened saved scan, from History:
     scanId?: string;
   }>();
@@ -38,6 +52,8 @@ export default function ScanResultScreen() {
   const [savedScanId, setSavedScanId] = useState<string | null>(null);
   const [hasBeenPosted, setHasBeenPosted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"about" | "benefits" | "preparation">("about");
+  const [aboutExpanded, setAboutExpanded] = useState(false);
 
   // True once loadData() has actually resolved a scan (fresh or reopened),
   // but couldn't find a matching entry in plant_info.json for its slug.
@@ -52,6 +68,20 @@ export default function ScanResultScreen() {
   const [displayAccuracy, setDisplayAccuracy] = useState<string | null>(null);
   const [displayDate, setDisplayDate] = useState<string | null>(null);
   const [displayTime, setDisplayTime] = useState<string | null>(null);
+  // The photo's own location — the capture-time GPS fix for a camera shot,
+  // the EXIF GPS for a gallery upload. Null when the photo has none.
+  const [photoCoords, setPhotoCoords] = useState<PhotoCoords | null>(null);
+  // Set when a gallery upload carries no location: posting is blocked and
+  // only Save / Go to Library are offered (see handlePost).
+  const [blockedFromPosting, setBlockedFromPosting] = useState(false);
+  // True when a camera photo carries no location purely because the user
+  // refused location permission — Post asks them once more before refusing.
+  const [locationDenied, setLocationDenied] = useState(false);
+  // True while that second permission prompt / GPS fix is in flight.
+  const [locating, setLocating] = useState(false);
+  // Full-screen viewer — tapping the hero photo opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadData();
@@ -71,9 +101,13 @@ export default function ScanResultScreen() {
       // date/time, accuracy from Supabase), but plant DETAILS still come
       // from the local plant_info.json via the saved plant_slug — no
       // Supabase plants table involved.
+      //
+      // "*" rather than a column list so this keeps working before the
+      // latitude/longitude columns exist on `scans` (see the note in
+      // performSave) — a missing column would otherwise fail the whole read.
       const { data: scan, error } = await supabase
         .from("scans")
-        .select("id, name, accuracy, date, time, image_url, plant_slug")
+        .select("*")
         .eq("id", params.scanId)
         .maybeSingle();
 
@@ -90,6 +124,16 @@ export default function ScanResultScreen() {
       setDisplayTime(scan.time);
       setPlantSlug(scan.plant_slug);
       setDisplayName(scan.name); // stored display name, no need to recompute
+      // Location stored when this scan was saved (may be null, and null
+      // also before the columns exist).
+      setPhotoCoords(
+        coordsFromParams(
+          scan.latitude == null ? null : String(scan.latitude),
+          scan.longitude == null ? null : String(scan.longitude)
+        )
+      );
+      setBlockedFromPosting(false);
+      setLocationDenied(false);
 
       // NOTE: this can come back null if plant_slug no longer has a
       // matching entry in plant_info.json — e.g. a class was renamed or
@@ -127,6 +171,17 @@ export default function ScanResultScreen() {
     setPlantSlug(params.slug);
     setDisplayName(getDisplayName(params.slug));
 
+    const coords = coordsFromParams(params.photoLat, params.photoLng);
+    setPhotoCoords(coords);
+    // A gallery upload without EXIF GPS can't be posted: its location can't
+    // be recovered, and guessing (e.g. the device's position right now)
+    // would pin the wrong place entirely. Posting is blocked instead —
+    // Save and Go to Library keep working.
+    setBlockedFromPosting(params.imageSource === "library" && coords == null);
+    // Only a fresh scan can know WHY there's no location. A camera photo
+    // with denied permission gets one more chance at Post time.
+    setLocationDenied(params.locationDenied === "1");
+
     const details = getPlantDetailsBySlug(params.slug);
     setPlant(details);
     if (!details) setNotFound(true);
@@ -151,8 +206,12 @@ export default function ScanResultScreen() {
    *
    * Returns the new scan id on success, or null on failure (and shows
    * its own error alert on failure, since every caller needs that).
+   *
+   * `coords` defaults to the photo's capture-time location; handlePost
+   * passes a fix it obtained late (permission granted at Post time) so
+   * that spot is the one persisted with the scan.
    */
-  async function performSave(): Promise<string | null> {
+  async function performSave(coords: PhotoCoords | null = photoCoords): Promise<string | null> {
     if (!plant || !plantSlug || !displayImageUri) return null;
 
     setSaving(true);
@@ -182,7 +241,29 @@ export default function ScanResultScreen() {
         throw error ?? new Error("Failed to save scan");
       }
 
+      // Capture-time location rides along with the saved scan, so a later
+      // Post — from History, even days later — pins the spot where the
+      // photo was actually taken instead of wherever the user is now.
+      //
+      // Deliberately best-effort and separate from the insert above: it
+      // only works once the latitude/longitude columns exist on `scans`.
+      // Until then it fails quietly and the save still succeeds — the
+      // location simply isn't persisted yet.
+      if (coords) {
+        await supabase
+          .from("scans")
+          .update({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          })
+          .eq("id", scan.id);
+      }
+
       setSavedScanId(scan.id);
+      // History caches its list between focuses — tell it this save
+      // changed things so the next open re-queries instead of showing
+      // the old rows.
+      invalidateScanHistory();
       return scan.id;
     } catch (err) {
       console.error("[scanresult] save failed:", err);
@@ -222,6 +303,21 @@ export default function ScanResultScreen() {
   // Post — always requires being online and logged in. Auto-saves first
   // if this scan hasn't been saved yet, then navigates.
   async function handlePost() {
+    // A gallery upload with no location can't be pinned honestly, so it
+    // can't be posted at all — the only things left to do with it are
+    // saving the scan or heading to the library.
+    if (blockedFromPosting) {
+      Alert.alert(
+        "No location on this photo",
+        "The image you're trying to post doesn't contain any location, so it can't be shared. You can still save this scan or go to the library.",
+        [
+          { text: "Save", onPress: handleSave },
+          { text: "Go to Library", onPress: handleGoToLibrary },
+        ]
+      );
+      return;
+    }
+
     if (isGuest) {
       promptSignUp();
       return;
@@ -236,17 +332,58 @@ export default function ScanResultScreen() {
       return;
     }
 
+    // The camera photo carries no location purely because permission was
+    // refused on the Scan screen — so ask once more before posting.
+    // Granted: a fix is taken right now and posted with (and stored on
+    // the scan). Still denied: posting stays blocked until location
+    // access is allowed.
+    let postCoords = photoCoords;
+    if (locationDenied && !postCoords) {
+      setLocating(true);
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+
+        if (!permission.granted) {
+          Alert.alert(
+            "Location permission needed",
+            "Allow location access to post this scan result — without it there's no way to show where this plant was found. You can still save it or go to the library.",
+            [
+              { text: "Save", onPress: handleSave },
+              { text: "Go to Library", onPress: handleGoToLibrary },
+            ]
+          );
+          return;
+        }
+
+        const coords = await getCaptureLocation();
+        if (!coords) {
+          Alert.alert(
+            "Couldn't get your location",
+            "Location permission is on, but no location was found yet. Turn on GPS and try again, or save this scan instead."
+          );
+          return;
+        }
+
+        postCoords = coords;
+        setPhotoCoords(coords); // keep the screen consistent if we stay
+      } finally {
+        setLocating(false);
+      }
+    }
+
     let scanId = savedScanId;
     if (!scanId) {
-      scanId = await performSave();
+      scanId = await performSave(postCoords);
       if (!scanId) return; // save failed — performSave already alerted
     }
 
     if (!plant) return;
 
+    // The photo's own location travels with it, so Create Post pins the
+    // original spot instead of asking the device where it is right now.
     router.push({
       pathname: "/createpost",
-      params: { scanId },
+      params: { scanId, ...coordsToParams(postCoords) },
     });
   }
 
@@ -305,6 +442,9 @@ export default function ScanResultScreen() {
       const { error } = await supabase.from("scans").delete().eq("id", savedScanId);
 
       if (error) throw error;
+
+      // Same deal as saving: the next History open must refetch.
+      invalidateScanHistory();
 
       // NOTE: this does not delete the image from Cloudinary — that
       // requires a Supabase Edge Function (not built yet, parked for
@@ -378,10 +518,21 @@ export default function ScanResultScreen() {
     );
   }
 
-  // Fresh, unsaved scans show a generic header; once a scan is saved
-  // (either just now or reopened from History), the header shows the
-  // plant's name instead — matches the mockups.
-  const headerTitle = savedScanId ? displayName : "Scan Result";
+  // Header always reads "Scan Result" — matches the mockup.
+  const headerTitle = "Scan Result";
+
+  const aboutText = plant?.about ?? "";
+  const ABOUT_PREVIEW_LENGTH = 260;
+  const aboutTruncated =
+    aboutText.length > ABOUT_PREVIEW_LENGTH && !aboutExpanded
+      ? aboutText.slice(0, ABOUT_PREVIEW_LENGTH).trimEnd()
+      : aboutText;
+
+  const tabDefs = [
+    { key: "about", label: "About" },
+    { key: "benefits", label: "Benefits" },
+    { key: "preparation", label: "Preparation" },
+  ] as const;
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
@@ -392,179 +543,309 @@ export default function ScanResultScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Image
               source={require("@/assets/images/icons/arrow_left.png")}
-              style={{ width: 26, height: 26 }}
+              style={{ width: 26, height: 26, tintColor: "#1A1A1A" }}
               resizeMode="contain"
             />
           </Pressable>
           <Text
-            className="flex-1 text-center text-xl font-bold mr-6"
-            style={{ color: "#1B4332" }}
+            className="flex-1 text-center font-bold"
+            style={{ color: "#1A1A1A", fontSize: 22, marginRight: 28 }}
             numberOfLines={1}
           >
             {headerTitle}
           </Text>
         </View>
 
-        <View
-          className="rounded-2xl p-4 mt-4"
-          style={{ backgroundColor: "#B7E4C7" }}
-        >
-          {/* Result card */}
-          <View
-            className="rounded-2xl p-3 flex-row items-center"
-            style={{ backgroundColor: "#FFFFFF" }}
-          >
-            <Image
-              source={{ uri: displayImageUri ?? undefined }}
-              style={{ width: 60, height: 60, borderRadius: 12 }}
-            />
-            <View className="ml-3 flex-1">
-              <Text className="font-bold" style={{ color: "#1B4332" }}>
-                {displayName} ({plant.scientific_name})
-              </Text>
-              <Text className="text-xs" style={{ color: "#374151" }}>
-                Accuracy: {displayAccuracy}%
-              </Text>
-              <Text className="text-xs mt-1" style={{ color: "#6b7280" }}>
-                Date: {displayDate}
-              </Text>
-              <Text className="text-xs" style={{ color: "#6b7280" }}>
-                Time: {displayTime}
-              </Text>
-            </View>
-          </View>
+        {/* Hero photo — tap to view full-screen */}
+        <Pressable onPress={() => displayImageUri && setViewerUri(displayImageUri)}>
+          <Image
+            source={{ uri: displayImageUri ?? undefined }}
+            style={{ width: "100%", height: 360, borderRadius: 24, marginTop: 16 }}
+            resizeMode="cover"
+          />
+        </Pressable>
 
-          {/* About */}
-          {plant.about && (
-            <View className="rounded-2xl p-3 mt-3" style={{ backgroundColor: "#FFFFFF" }}>
-              <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+        {/* Name + accuracy row */}
+        <View className="flex-row items-end justify-between mt-4">
+          <View className="flex-1 mr-3">
+            <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
+              {displayName}
+            </Text>
+            <Text className="mt-0.5" style={{ color: "#6b7280", fontSize: 15 }}>
+              {plant.scientific_name}
+            </Text>
+          </View>
+          <View
+            className="rounded-full px-4 py-2"
+            style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" }}
+          >
+            <Text style={{ color: "#4b5563", fontSize: 14 }}>
+              Accuracy: {displayAccuracy}%
+            </Text>
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View
+          className="flex-row items-center mt-4 p-1.5"
+          style={{ backgroundColor: "#FFFFFF", borderRadius: 16 }}
+        >
+          {tabDefs.map((tab) => {
+            const selected = activeTab === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                className="flex-1 items-center py-3"
+                style={{
+                  backgroundColor: selected ? "#2F5233" : "transparent",
+                  borderRadius: 12,
+                }}
+              >
+                <Text
+                  className={selected ? "font-bold" : "font-semibold"}
+                  style={{
+                    color: selected ? "#FFFFFF" : "#6b7280",
+                    fontSize: 15,
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Tab content card */}
+        <View
+          className="mt-4 p-5"
+          style={{ backgroundColor: "#FFFFFF", borderRadius: 20, minHeight: 220 }}
+        >
+          {activeTab === "about" && (
+            <>
+              <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 17 }}>
                 About
               </Text>
-              <Text className="text-sm" style={{ color: "#374151" }}>
-                {plant.about}
-              </Text>
-            </View>
+              {aboutText ? (
+                <Text style={{ color: "#4b5563", fontSize: 15, lineHeight: 23 }}>
+                  {aboutTruncated}
+                  {aboutText.length > ABOUT_PREVIEW_LENGTH && !aboutExpanded && (
+                    <Text
+                      className="font-bold"
+                      style={{ color: "#1A1A1A" }}
+                      onPress={() => setAboutExpanded(true)}
+                    >
+                      ...More
+                    </Text>
+                  )}
+                  {aboutExpanded && aboutText.length > ABOUT_PREVIEW_LENGTH && (
+                    <Text
+                      className="font-bold"
+                      style={{ color: "#1A1A1A" }}
+                      onPress={() => setAboutExpanded(false)}
+                    >
+                      {"  Less"}
+                    </Text>
+                  )}
+                </Text>
+              ) : (
+                <Text style={{ color: "#4b5563", fontSize: 15 }}>
+                  No description available for this plant yet.
+                </Text>
+              )}
+            </>
           )}
 
-          {/* Benefits — array of strings, rendered as a bullet list */}
-          {plant.benefits && plant.benefits.length > 0 && (
-            <View className="rounded-2xl p-3 mt-3" style={{ backgroundColor: "#FFFFFF" }}>
-              <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+          {activeTab === "benefits" && (
+            <>
+              <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 17 }}>
                 Benefits
               </Text>
-              {plant.benefits.map((benefit, index) => (
-                <Text key={index} className="text-sm" style={{ color: "#374151" }}>
-                  • {benefit}
+              {plant.benefits && plant.benefits.length > 0 ? (
+                plant.benefits.map((benefit, index) => (
+                  <View key={index} className="flex-row mt-1">
+                    <Text style={{ color: "#4b5563", fontSize: 15, lineHeight: 23 }}>
+                      {"\u2022  "}
+                    </Text>
+                    <Text className="flex-1" style={{ color: "#4b5563", fontSize: 15, lineHeight: 23 }}>
+                      {benefit}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: "#4b5563", fontSize: 15 }}>
+                  No benefits listed for this plant yet.
                 </Text>
-              ))}
-            </View>
+              )}
+            </>
           )}
 
-          {/* Preparation — array of strings, rendered as a bullet list */}
-          {plant.preparation_methods && plant.preparation_methods.length > 0 && (
-            <View className="rounded-2xl p-3 mt-3" style={{ backgroundColor: "#FFFFFF" }}>
-              <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+          {activeTab === "preparation" && (
+            <>
+              <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 17 }}>
                 Preparation
               </Text>
-              {plant.preparation_methods.map((method, index) => (
-                <Text key={index} className="text-sm" style={{ color: "#374151" }}>
-                  • {method}
+              {plant.preparation_methods && plant.preparation_methods.length > 0 ? (
+                plant.preparation_methods.map((method, index) => (
+                  <Text
+                    key={index}
+                    style={{
+                      color: "#4b5563",
+                      fontSize: 15,
+                      lineHeight: 23,
+                      marginBottom: index < plant.preparation_methods!.length - 1 ? 10 : 0,
+                    }}
+                  >
+                    {method}
+                  </Text>
+                ))
+              ) : (
+                <Text style={{ color: "#4b5563", fontSize: 15 }}>
+                  No preparation guide for this plant yet.
                 </Text>
-              ))}
-            </View>
-          )}
-
-          <Text className="text-xs text-center mt-3 px-2" style={{ color: "#374151" }}>
-            For general information only, not medical advice. Consult a doctor
-            before using any herbal remedy.
-          </Text>
-
-          {!savedScanId ? (
-            <>
-              {/* Save — shown before this scan has ever been saved.
-                  On success, redirects the user to Home. */}
-              <Pressable
-                onPress={handleSave}
-                disabled={saving}
-                className="rounded-full py-3 items-center mt-4"
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderWidth: 1,
-                  borderColor: "#1B4332",
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >
-                <Text className="font-bold" style={{ color: "#1B4332" }}>
-                  {saving ? "Saving..." : "Save"}
-                </Text>
-              </Pressable>
-
-              {/* Go to Library — offered even before saving; behavior
-                  branches on guest/online status inside the handler */}
-              <Pressable
-                onPress={handleGoToLibrary}
-                disabled={saving}
-                className="rounded-full py-3 items-center mt-3"
-                style={{ backgroundColor: "#52796F", opacity: saving ? 0.6 : 1 }}
-              >
-                <Text className="text-white font-bold">Go to Library</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handlePost}
-                disabled={saving}
-                className="rounded-full py-3 items-center mt-3"
-                style={{ backgroundColor: "#1B4332", opacity: saving ? 0.6 : 1 }}
-              >
-                <Text className="text-white font-bold">{saving ? "Saving..." : "Post"}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              {/* Go to Library — shown once saved, whether reopened from
-                  History or just saved moments ago in this same session */}
-              <Pressable
-                onPress={handleGoToLibrary}
-                className="rounded-full py-3 items-center mt-4"
-                style={{ backgroundColor: "#52796F" }}
-              >
-                <Text className="text-white font-bold">Go to Library</Text>
-              </Pressable>
-
-              {/* Post — hidden once this scan already has a post */}
-              {!hasBeenPosted && (
-                <Pressable
-                  onPress={handlePost}
-                  disabled={saving}
-                  className="rounded-full py-3 items-center mt-3"
-                  style={{ backgroundColor: "#1B4332", opacity: saving ? 0.6 : 1 }}
-                >
-                  <Text className="text-white font-bold">{saving ? "Saving..." : "Post"}</Text>
-                </Pressable>
               )}
-
-              {/* Delete */}
-              <Pressable
-                onPress={handleDelete}
-                disabled={deleting}
-                className="rounded-full py-3 items-center mt-3"
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderWidth: 1,
-                  borderColor: "#DC2626",
-                  opacity: deleting ? 0.6 : 1,
-                }}
-              >
-                <Text className="font-bold" style={{ color: "#DC2626" }}>
-                  {deleting ? "Deleting..." : "Delete"}
-                </Text>
-              </Pressable>
             </>
           )}
         </View>
 
+        {!savedScanId ? (
+          <>
+            {/* Go to Library */}
+            <Pressable
+              onPress={handleGoToLibrary}
+              disabled={saving}
+              className="items-center mt-4 py-4"
+              style={{ backgroundColor: "#5F7E6E", borderRadius: 10, opacity: saving ? 0.6 : 1 }}
+            >
+              <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                Go to Library
+              </Text>
+            </Pressable>
+
+            {/* Save */}
+            <Pressable
+              onPress={handleSave}
+              disabled={saving}
+              className="items-center mt-3 py-4"
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1.5,
+                borderColor: "#1E7A34",
+                borderRadius: 10,
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              <Text className="font-medium" style={{ color: "#1E7A34", fontSize: 16 }}>
+                {saving ? "Saving..." : "Save"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handlePost}
+              disabled={saving || locating}
+              className="items-center mt-3 py-4"
+              style={{
+                backgroundColor: "#1E7A34",
+                borderRadius: 10,
+                opacity: saving || locating ? 0.6 : 1,
+              }}
+            >
+              <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                {saving ? "Saving..." : locating ? "Getting location..." : "Post"}
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            {/* Go to Library — shown once saved, whether reopened from
+                History or just saved moments ago in this same session */}
+            <Pressable
+              onPress={handleGoToLibrary}
+              className="items-center mt-4 py-4"
+              style={{ backgroundColor: "#5F7E6E", borderRadius: 10 }}
+            >
+              <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                Go to Library
+              </Text>
+            </Pressable>
+
+            {/* Post — hidden once this scan already has a post */}
+            {!hasBeenPosted && (
+              <Pressable
+                onPress={handlePost}
+                disabled={saving || locating}
+                className="items-center mt-3 py-4"
+                style={{
+                  backgroundColor: "#1E7A34",
+                  borderRadius: 10,
+                  opacity: saving || locating ? 0.6 : 1,
+                }}
+              >
+                <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                  {saving ? "Saving..." : locating ? "Getting location..." : "Post"}
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Delete */}
+            <Pressable
+              onPress={handleDelete}
+              disabled={deleting}
+              className="items-center mt-3 py-4"
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1.5,
+                borderColor: "#DC2626",
+                borderRadius: 10,
+                opacity: deleting ? 0.6 : 1,
+              }}
+            >
+              <Text className="font-medium" style={{ color: "#DC2626", fontSize: 16 }}>
+                {deleting ? "Deleting..." : "Delete"}
+              </Text>
+            </Pressable>
+          </>
+        )}
+
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* Image viewer — tap the photo to see it full-screen; tap anywhere
+          or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

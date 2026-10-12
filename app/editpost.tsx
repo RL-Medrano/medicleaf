@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   TextInput,
-  Switch,
   StatusBar,
   Alert,
   ActivityIndicator,
@@ -14,9 +13,8 @@ import {
   Modal,
   StyleSheet,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { reverseGeocode } from "@/utils/geoapify";
 import PinMap from "@/components/PinMap";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
@@ -49,22 +47,18 @@ export default function EditPostScreen() {
   const [saving, setSaving] = useState(false);
 
   const [caption, setCaption] = useState("");
-  const [pinOn, setPinOn] = useState(false);
+  // The post's own location — display only. It was fixed when the photo
+  // was taken (or read from its EXIF) and can't be edited here.
   const [coord, setCoord] = useState<Coord | null>(null);
-  const [pinChanged, setPinChanged] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Full-screen viewer — tapping the post image opens it here.
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   // Does the form still hold anything the database doesn't have yet?
-  // Compared against exactly what Save would write (caption is trimmed and
-  // an empty caption is stored as null).
-  const hadPin = post != null && post.latitude != null && post.longitude != null;
-  const dirty =
-    post != null &&
-    ((caption.trim() || null) !== (post.caption ?? null) ||
-      pinOn !== hadPin ||
-      (pinOn &&
-        coord != null &&
-        (coord.latitude !== post.latitude || coord.longitude !== post.longitude)));
+  // The caption is the only editable field, so it alone counts — it is
+  // trimmed and an empty caption is stored as null.
+  const dirty = post != null && (caption.trim() || null) !== (post.caption ?? null);
 
   useEffect(() => {
     loadPost();
@@ -108,25 +102,12 @@ export default function EditPostScreen() {
     setPost(p);
     setCaption(p.caption ?? "");
 
+    // Fixed location, shown read-only on the map below.
     if (p.latitude != null && p.longitude != null) {
       setCoord({ latitude: p.latitude, longitude: p.longitude });
-      setPinOn(true);
     }
 
     setLoading(false);
-  }
-
-  // PinMap hands us the coordinate directly (single taps only — it also
-  // swallows double taps so they can open the map full screen).
-  function handlePinChange(c: Coord) {
-    if (!pinOn) return;
-    setCoord(c);
-    setPinChanged(true);
-  }
-
-  function handleTogglePin(value: boolean) {
-    setPinOn(value);
-    setPinChanged(true);
   }
 
   // Leaving is only allowed straight away when nothing is pending —
@@ -137,28 +118,8 @@ export default function EditPostScreen() {
     else router.back();
   }
 
-  async function resolveLocationName(c: Coord, fallback: string | null) {
-    try {
-      // Same helper Create Post uses, so both screens store the exact same
-      // "City/Municipality, Province" label (e.g. "Padre Garcia, Batangas")
-      // for the same coordinates.
-      const geocoded = await reverseGeocode(c.latitude, c.longitude);
-      if (geocoded.formatted && geocoded.formatted !== "Unknown location") {
-        return geocoded.formatted;
-      }
-    } catch {
-      // fall through to the fallback below
-    }
-    return fallback ?? `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`;
-  }
-
   async function handleSave() {
     if (!post || saving) return;
-
-    if (pinOn && !coord) {
-      Alert.alert("Pin your location", "Tap on the map to drop a pin, or turn off Pin Location.");
-      return;
-    }
 
     setSaving(true);
     try {
@@ -168,36 +129,13 @@ export default function EditPostScreen() {
         return;
       }
 
-      // Only these columns are ever sent — created_at is never touched,
-      // so the post keeps its original date and time.
-      const updates: {
-        caption: string | null;
-        location_name?: string | null;
-        latitude?: number | null;
-        longitude?: number | null;
-      } = {
-        caption: caption.trim() || null,
-      };
-
-      if (pinChanged) {
-        if (pinOn && coord) {
-          updates.location_name = await resolveLocationName(coord, post.location_name);
-          updates.latitude = coord.latitude;
-          updates.longitude = coord.longitude;
-        } else {
-          updates.location_name = null;
-          updates.latitude = null;
-          updates.longitude = null;
-        }
-      } else if (pinOn && coord) {
-        // Pin untouched — still refresh the stored label. Posts saved before
-        // the reverse-geocode fix can name the wrong city, and this lets any
-        // edit correct them instead of leaving a stale location_name next to
-        // the coordinates.
-        updates.location_name = await resolveLocationName(coord, post.location_name);
-      }
-
-      const { error } = await supabase.from("posts").update(updates).eq("id", post.id);
+      // Caption only — the photo and its location were fixed when the scan
+      // was made, so nothing else is ever written. created_at is never
+      // touched either, so the post keeps its original date and time.
+      const { error } = await supabase
+        .from("posts")
+        .update({ caption: caption.trim() || null })
+        .eq("id", post.id);
       if (error) throw error;
 
       router.back();
@@ -245,13 +183,15 @@ export default function EditPostScreen() {
           className="rounded-2xl p-4"
           style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D1D5DB" }}
         >
-          {/* Plant summary (not editable) */}
+          {/* Plant summary (not editable) — tap the image to view full-screen */}
           <View className="flex-row items-center">
-            <Image
-              source={{ uri: post.image_url }}
-              style={{ width: 110, height: 84 }}
-              resizeMode="cover"
-            />
+            <Pressable onPress={() => setViewerUri(post.image_url)}>
+              <Image
+                source={{ uri: post.image_url }}
+                style={{ width: 110, height: 84 }}
+                resizeMode="cover"
+              />
+            </Pressable>
             <View className="ml-4 flex-1">
               <Text className="font-bold" style={{ color: "#000000", fontSize: 16 }}>
                 {post.name}
@@ -264,7 +204,7 @@ export default function EditPostScreen() {
             </View>
           </View>
 
-          {/* Caption */}
+          {/* Caption — the only editable field on this screen */}
           <Text className="font-bold mt-4" style={{ color: "#000000" }}>
             Say something
           </Text>
@@ -274,6 +214,8 @@ export default function EditPostScreen() {
             multiline
             textAlignVertical="top"
             maxLength={500}
+            placeholder="Share something about this find..."
+            placeholderTextColor="#9ca3af"
             className="rounded-2xl px-3 py-3 mt-2"
             style={{
               height: 120,
@@ -283,36 +225,29 @@ export default function EditPostScreen() {
             }}
           />
 
-          {/* Location */}
+          {/* Location — the photo's own spot, fixed when it was taken.
+              Read-only: the pin can't be dropped, moved or removed. */}
           <Text className="font-bold mt-4" style={{ color: "#000000" }}>
             Where did you find it?
           </Text>
           <Text className="text-xs" style={{ color: "#6b7280" }}>
-            Tap to drop the pin · Double-tap to view the map full screen
+            Double-tap to view the map full screen
           </Text>
 
-          <PinMap
-            coord={coord}
-            onPinChange={handlePinChange}
-            zoom={coord ? 15 : 13}
-            height={170}
-            borderRadius={20}
-            disabled={!pinOn}
-            showPin={pinOn}
-            style={{ marginTop: 8, opacity: pinOn ? 1 : 0.5 }}
-          />
-
-          <View className="flex-row items-center mt-3">
-            <Switch
-              value={pinOn}
-              onValueChange={handleTogglePin}
-              trackColor={{ false: "#D1D5DB", true: "#95D5B2" }}
-              thumbColor={pinOn ? "#1B4332" : "#F3F4F6"}
-            />
-            <Text className="ml-2" style={{ color: "#6b7280" }}>
-              Pin Location
+          {coord ? (
+            <>
+              <PinMap coord={coord} zoom={15} height={170} borderRadius={20} style={{ marginTop: 8 }} />
+              {post.location_name ? (
+                <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                  {post.location_name}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+              This post doesn't include a location.
             </Text>
-          </View>
+          )}
 
           {/* Save */}
           <Pressable
@@ -366,6 +301,43 @@ export default function EditPostScreen() {
               <Text style={styles.disregardText}>Disregard changes</Text>
             </Pressable>
           </View>
+        </View>
+      </Modal>
+
+      {/* Image viewer — tap the image to see it full-screen; tap anywhere
+          or press Android back to close. */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute",
+              top: insets.top + 10,
+              right: 16,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={require("@/assets/images/icons/close.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => setViewerUri(null)}>
+            {!!viewerUri && (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ flex: 1, width: "100%" }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
         </View>
       </Modal>
     </SafeAreaView>
