@@ -216,26 +216,14 @@ export default function HistoryScreen() {
                 style={{ width: 112, height: 112, borderRadius: 12 }}
               />
               <View className="flex-1 ml-3 justify-center">
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    className="font-bold flex-1"
-                    style={{ color: "#1A1A1A", fontSize: 18 }}
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </Text>
-                  <View
-                    className="rounded-full px-3 py-1 ml-2"
-                    style={{ backgroundColor: "#EDF2E9" }}
-                  >
-                    <Text
-                      className="font-bold"
-                      style={{ color: "#1A1A1A", fontSize: 13 }}
-                    >
-                      {item.accuracy}%
-                    </Text>
-                  </View>
-                </View>
+                {/* Accuracy pill removed per updated mockup */}
+                <Text
+                  className="font-bold"
+                  style={{ color: "#1A1A1A", fontSize: 18 }}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
                 <Text className="mt-1.5" style={{ color: "#6b7280", fontSize: 14 }}>
                   Date: {formatDate(item.date)}
                 </Text>

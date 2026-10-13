@@ -565,24 +565,14 @@ export default function ScanResultScreen() {
           />
         </Pressable>
 
-        {/* Name + accuracy row */}
-        <View className="flex-row items-end justify-between mt-4">
-          <View className="flex-1 mr-3">
-            <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
-              {displayName}
-            </Text>
-            <Text className="mt-0.5" style={{ color: "#6b7280", fontSize: 15 }}>
-              {plant.scientific_name}
-            </Text>
-          </View>
-          <View
-            className="rounded-full px-4 py-2"
-            style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" }}
-          >
-            <Text style={{ color: "#4b5563", fontSize: 14 }}>
-              Accuracy: {displayAccuracy}%
-            </Text>
-          </View>
+        {/* Name row — accuracy pill removed per updated mockup */}
+        <View className="mt-4">
+          <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
+            {displayName}
+          </Text>
+          <Text className="mt-0.5" style={{ color: "#6b7280", fontSize: 15 }}>
+            {plant.scientific_name}
+          </Text>
         </View>
 
         {/* Tabs */}

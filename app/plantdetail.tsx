@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
-  LayoutChangeEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -16,7 +15,7 @@ import { CachedPlantImageGallery } from "@/components/CachedPlantImage";
 const TABS = ["About", "Benefits", "How to use"] as const;
 type Tab = (typeof TABS)[number];
 
-// Characters of the About text shown before it collapses behind "…More".
+// Characters of the About text shown before it collapses behind "...More".
 const ABOUT_COLLAPSED_CHARS = 320;
 
 export default function PlantDetailScreen() {
@@ -30,18 +29,12 @@ export default function PlantDetailScreen() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
-  const scrollRef = useRef<ScrollView>(null);
-  // Y-position of each section within the scroll content, captured via onLayout
-  const sectionY = useRef<Record<Tab, number>>({
-    About: 0,
-    Benefits: 0,
-    "How to use": 0,
-  });
-
-  // Fresh state per plant: hero gallery back on slide 1, About collapsed.
+  // Fresh state per plant: hero gallery back on slide 1, About collapsed,
+  // and the About tab selected.
   useEffect(() => {
     setHeroIndex(0);
     setAboutExpanded(false);
+    setActiveTab("About");
   }, [slug]);
 
   // Hero slide size is measured from the real container (onLayout) instead of
@@ -78,25 +71,16 @@ export default function PlantDetailScreen() {
     );
   }
 
-  // About text is collapsed behind an inline "…More" until tapped.
+  // About text is collapsed behind an inline "...More" until tapped —
+  // same pattern as scanresult.tsx. The preview always cuts on a word
+  // boundary so a word is never sliced in half.
   const aboutTruncated = plant.about.length > ABOUT_COLLAPSED_CHARS;
   const aboutSlice = plant.about.slice(0, ABOUT_COLLAPSED_CHARS);
   const aboutCutAt = aboutSlice.lastIndexOf(" ");
   const aboutPreview =
     aboutTruncated && !aboutExpanded
-      ? `${aboutSlice.slice(0, aboutCutAt > 160 ? aboutCutAt : aboutSlice.length).trim()}…`
+      ? aboutSlice.slice(0, aboutCutAt > 160 ? aboutCutAt : aboutSlice.length).trim()
       : plant.about;
-
-  function handleTabPress(tab: Tab) {
-    setActiveTab(tab);
-    scrollRef.current?.scrollTo({ y: Math.max(sectionY.current[tab] - 12, 0), animated: true });
-  }
-
-  function recordSectionY(tab: Tab) {
-    return (event: LayoutChangeEvent) => {
-      sectionY.current[tab] = event.nativeEvent.layout.y;
-    };
-  }
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
@@ -113,12 +97,13 @@ export default function PlantDetailScreen() {
         <Text
           className="flex-1 text-xl font-bold text-center"
           style={{ color: "#1A1A1A", marginRight: 24 }}
+          numberOfLines={1}
         >
           {plant.name}
         </Text>
       </View>
 
-      <ScrollView ref={scrollRef} className="flex-1 px-8" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-8" showsVerticalScrollIndicator={false}>
         {/* Hero image — full-width, matches the mockup; falls back to the
             gray "No image available" box when the Cloudinary photo is missing.
             The wrapper clips (overflow hidden + rounded corners) so no part of
@@ -147,10 +132,10 @@ export default function PlantDetailScreen() {
         {/* Name + scientific name, with the gallery dots on the right */}
         <View className="flex-row items-center mt-5">
           <View className="flex-1 mr-3">
-            <Text style={{ fontSize: 26, fontWeight: "bold", color: "#1A1A1A" }}>
+            <Text style={{ fontSize: 28, fontWeight: "bold", color: "#1A1A1A" }}>
               {plant.name}
             </Text>
-            <Text className="mt-1" style={{ fontSize: 14, color: "#6b7280" }}>
+            <Text className="mt-0.5" style={{ fontSize: 15, color: "#6b7280" }}>
               {plant.scientific_name}
             </Text>
           </View>
@@ -175,27 +160,27 @@ export default function PlantDetailScreen() {
           )}
         </View>
 
-        {/* Tabs — white bar with an inset active pill, per mockup;
-            tapping scrolls to the section below */}
+        {/* Tabs — white rounded bar with an inset active pill, per mockup;
+            tapping swaps the card content below, like the Scan Result screen */}
         <View
-          className="flex-row mt-5 mb-4 p-1"
-          style={{ backgroundColor: "#FFFFFF", borderRadius: 999 }}
+          className="flex-row mt-5 mb-4 p-1.5"
+          style={{ backgroundColor: "#FFFFFF", borderRadius: 16 }}
         >
           {TABS.map((tab) => {
             const active = activeTab === tab;
             return (
               <Pressable
                 key={tab}
-                onPress={() => handleTabPress(tab)}
-                className="flex-1 items-center py-2.5"
+                onPress={() => setActiveTab(tab)}
+                className="flex-1 items-center py-3"
                 style={{
                   backgroundColor: active ? "#1B4332" : "transparent",
                   borderRadius: 12,
                 }}
               >
                 <Text
-                  className="font-semibold"
-                  style={{ fontSize: 14, color: active ? "#FFFFFF" : "#1B4332" }}
+                  className={active ? "font-bold" : "font-semibold"}
+                  style={{ fontSize: 15, color: active ? "#FFFFFF" : "#1B4332" }}
                 >
                   {tab}
                 </Text>
@@ -204,36 +189,54 @@ export default function PlantDetailScreen() {
           })}
         </View>
 
-        {/* About section */}
-        <View onLayout={recordSectionY("About")}>
-          <View className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF" }}>
-            <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 16 }}>
-              About
-            </Text>
-            <Pressable onPress={() => aboutTruncated && setAboutExpanded(true)}>
+        {/* About tab — plant.about (collapsed behind "...More") + fun fact */}
+        {activeTab === "About" && (
+          <>
+            <View className="p-5" style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}>
+              <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 17 }}>
+                About
+              </Text>
               <Text className="leading-6" style={{ color: "#374151", fontSize: 15 }}>
                 {aboutPreview}
                 {aboutTruncated && !aboutExpanded && (
-                  <Text style={{ fontWeight: "bold", color: "#1A1A1A" }}>…More</Text>
+                  <Text
+                    className="font-bold"
+                    style={{ color: "#1A1A1A" }}
+                    onPress={() => setAboutExpanded(true)}
+                  >
+                    ...More
+                  </Text>
+                )}
+                {aboutTruncated && aboutExpanded && (
+                  <Text
+                    className="font-bold"
+                    style={{ color: "#1A1A1A" }}
+                    onPress={() => setAboutExpanded(false)}
+                  >
+                    {"  Less"}
+                  </Text>
                 )}
               </Text>
-            </Pressable>
-          </View>
+            </View>
 
-          <View className="rounded-2xl p-4 mt-3" style={{ backgroundColor: "#B7E4C7" }}>
-            <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
-              🌿 Did you know?
-            </Text>
-            <Text className="text-sm leading-5" style={{ color: "#1B4332" }}>
-              {plant.funFact}
-            </Text>
-          </View>
-        </View>
+            <View
+              className="p-5 mt-3"
+              style={{ backgroundColor: "#B7E4C7", borderRadius: 20 }}
+            >
+              <Text className="font-bold mb-1" style={{ color: "#1B4332" }}>
+                🌿 Did you know?
+              </Text>
+              <Text className="text-sm leading-5" style={{ color: "#1B4332" }}>
+                {plant.funFact}
+              </Text>
+            </View>
+          </>
+        )}
 
-        {/* Benefits section */}
-        <View onLayout={recordSectionY("Benefits")} className="mt-3">
-          <View className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF" }}>
-            <Text className="font-bold mb-2" style={{ color: "#1B4332" }}>
+        {/* Benefits tab — plant.benefits */}
+        {activeTab === "Benefits" && (
+          <View className="p-5" style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}>
+            <Text className="font-bold mb-2" style={{ color: "#1B4332", fontSize: 17 }}>
               Benefits
             </Text>
             {plant.benefits.map((benefit, i) => (
@@ -242,54 +245,64 @@ export default function PlantDetailScreen() {
               </Text>
             ))}
           </View>
-        </View>
+        )}
 
-        {/* How to use section */}
-        <View onLayout={recordSectionY("How to use")} className="mt-3">
-          {plant.preparations.map((prep, i) => (
+        {/* How to use tab — plant.preparations + precautions + alternatives */}
+        {activeTab === "How to use" && (
+          <>
+            {plant.preparations.map((prep, i) => (
+              <View
+                key={i}
+                className="p-5"
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  marginTop: i === 0 ? 0 : 12,
+                }}
+              >
+                <Text className="font-bold mb-2" style={{ color: "#1B4332", fontSize: 17 }}>
+                  {prep.title}
+                </Text>
+                <Text className="text-sm leading-5" style={{ color: "#374151" }}>
+                  {prep.instructions}
+                </Text>
+              </View>
+            ))}
+
             <View
-              key={i}
-              className="rounded-2xl p-4"
-              style={{ backgroundColor: "#FFFFFF", marginTop: i === 0 ? 0 : 12 }}
+              className="p-5 mt-3 border"
+              style={{
+                backgroundColor: "#FFF7E6",
+                borderColor: "#F0B429",
+                borderRadius: 20,
+              }}
             >
-              <Text className="font-bold mb-2" style={{ color: "#1B4332" }}>
-                {prep.title}
+              <Text className="font-bold mb-2" style={{ color: "#92610A", fontSize: 17 }}>
+                ⚠ Precautions
               </Text>
-              <Text className="text-sm leading-5" style={{ color: "#374151" }}>
-                {prep.instructions}
+              <Text className="text-sm leading-5" style={{ color: "#7A4F08" }}>
+                {plant.precautions}
               </Text>
             </View>
-          ))}
 
-          <View
-            className="rounded-2xl p-4 mt-3 border"
-            style={{ backgroundColor: "#FFF7E6", borderColor: "#F0B429" }}
-          >
-            <Text className="font-bold mb-2" style={{ color: "#92610A" }}>
-              ⚠ Precautions
-            </Text>
-            <Text className="text-sm leading-5" style={{ color: "#7A4F08" }}>
-              {plant.precautions}
-            </Text>
-          </View>
-
-          <View className="rounded-2xl p-4 mt-3" style={{ backgroundColor: "#FFFFFF" }}>
-            <Text className="font-bold mb-2" style={{ color: "#1B4332" }}>
-              Alternative:
-            </Text>
-            {plant.alternatives.map((alt, i) => (
-              <Text key={i} className="text-sm leading-5" style={{ color: "#374151" }}>
-                • {alt}
+            <View className="p-5 mt-3" style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}>
+              <Text className="font-bold mb-2" style={{ color: "#1B4332", fontSize: 17 }}>
+                Alternative:
               </Text>
-            ))}
-          </View>
+              {plant.alternatives.map((alt, i) => (
+                <Text key={i} className="text-sm leading-5" style={{ color: "#374151" }}>
+                  • {alt}
+                </Text>
+              ))}
+            </View>
 
-          <Text className="text-xs text-center mt-4 px-2" style={{ color: "#6b7280" }}>
-            This information is for general knowledge only and is not a substitute
-            for professional medical advice. Consult a doctor before using any
-            herbal remedy.
-          </Text>
-        </View>
+            <Text className="text-xs text-center mt-4 px-2" style={{ color: "#6b7280" }}>
+              This information is for general knowledge only and is not a substitute
+              for professional medical advice. Consult a doctor before using any
+              herbal remedy.
+            </Text>
+          </>
+        )}
 
         <View style={{ height: 24 }} />
       </ScrollView>
