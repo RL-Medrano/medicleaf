@@ -139,6 +139,10 @@ export default function CoachWalkthrough({
   const [index, setIndex] = useState(0);
   const [frame, setFrame] = useState<Rect | null>(null);
   const [screen, setScreen] = useState<{ w: number; h: number } | null>(null);
+  // The card's real height, measured on layout. estHeight is only an
+  // estimate for the auto-scroll — positioning uses this so the card
+  // lands exactly where it should regardless of copy length.
+  const [cardH, setCardH] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const step = steps[index];
@@ -220,22 +224,31 @@ export default function CoachWalkthrough({
   // clear the old hole and line the new one up.
   useEffect(() => {
     setFrame(null);
+    setCardH(0); // next step's card may be a different height
   }, [index]);
 
   useEffect(() => {
     if (!screen) return; // wait for the overlay's own layout first
     clearTimer();
-    timerRef.current = setTimeout(() => {
+    // A target can mount a beat AFTER the overlay (a list still swapping
+    // in its contents, a conditional branch flipping). Retry briefly
+    // before treating the step as unshowable — a lost race must not kill
+    // the walkthrough, but a genuinely absent target (empty feed) must
+    // not strand the user behind the dim either.
+    let attempts = 0;
+    const tryMeasure = () => {
       const target = targets[step.target]?.current;
       if (!target) {
-        // Nothing to highlight (e.g. an empty feed) — never strand the
-        // user behind a dimmed screen: move on, or end if it's the end.
-        if (index < total - 1) setIndex(index + 1);
+        if (attempts < 5) {
+          attempts += 1;
+          timerRef.current = setTimeout(tryMeasure, 200);
+        } else if (index < total - 1) setIndex(index + 1);
         else finish();
         return;
       }
       measure(target);
-    }, 70);
+    };
+    timerRef.current = setTimeout(tryMeasure, 70);
     return clearTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, screen]);
@@ -367,12 +380,36 @@ export default function CoachWalkthrough({
   }
 
   const hole = frame;
+  // Real card height, measured on layout; the step's estimate covers
+  // the first frame before onLayout fires.
+  const cardHeight = cardH || step.estHeight;
+
+  // "above" cards prefer sitting just over the target. When the target
+  // sits so high that the card would run off the top of the screen (the
+  // auto-scroll has nothing left to give), drop the card INSIDE the top
+  // of the spotlight instead — fully visible, never covering the
+  // screen's header/chrome ABOVE the target.
+  const aboveTop =
+    hole.y - CARD_GAP - cardHeight >= TOP_SAFE
+      ? hole.y - CARD_GAP - cardHeight
+      : Math.max(
+          TOP_SAFE,
+          Math.min(hole.y + CARD_GAP, screen.h - BOTTOM_SAFE - cardHeight)
+        );
+
   const cardPos =
     step.card === "above"
-      ? { bottom: screen.h - hole.y + CARD_GAP }
+      ? { top: aboveTop }
       : step.card === "bottom"
         ? { bottom: BOTTOM_SAFE + 4 }
-        : { top: hole.y + hole.h + CARD_GAP };
+        : // Below the target: anchor by bottom with the same clamp so a
+          // card that would overflow the bottom edge gets rescued too.
+          {
+            bottom: Math.max(
+              BOTTOM_SAFE + 4,
+              screen.h - (hole.y + hole.h + CARD_GAP) - cardHeight
+            ),
+          };
 
   return (
     <View
@@ -402,23 +439,36 @@ export default function CoachWalkthrough({
         onPress={() => {}}
       />
 
-      {/* White ring so the spotlight reads even over pale UI. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          left: hole.x - 3,
-          top: hole.y - 3,
-          width: hole.w + 6,
-          height: hole.h + 6,
-          borderRadius: 19,
-          borderWidth: 3,
-          borderColor: "rgba(255,255,255,0.95)",
-        }}
-      />
+      {/* White ring so the spotlight reads even over pale UI. Skipped
+          for edge-to-edge (full-width) holes — the History header and
+          the conversations list meet the dim directly in the mockups,
+          and a ring would draw a stray line across them. */}
+      {(hole.x > 0.5 || hole.w < screen.w - 0.5) && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: hole.x - 3,
+            top: hole.y - 3,
+            width: hole.w + 6,
+            height: hole.h + 6,
+            borderRadius: 19,
+            borderWidth: 3,
+            borderColor: "rgba(255,255,255,0.95)",
+          }}
+        />
+      )}
 
       {/* The card */}
-      <View style={[s.card, cardPos]}>
+      <View
+        style={[s.card, cardPos]}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          // Only write when it actually changes — onLayout re-fires on
+          // every reposition, and an unchanged value is a React no-op.
+          setCardH((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+        }}
+      >
         {renderHeader()}
         {/* Title lives in the header row for the badge variant */}
         {step.header !== "badge" && <Text style={s.cardTitle}>{step.title}</Text>}

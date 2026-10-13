@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Image, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Image, Pressable, StatusBar, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -136,7 +136,12 @@ export default function VerifyPinScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         {/* Same back button as login/signup: the back.png icon with the
             word kept beside it, lowered (mt-2) so it clears the status bar. */}
         <Pressable
@@ -184,7 +189,7 @@ export default function VerifyPinScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

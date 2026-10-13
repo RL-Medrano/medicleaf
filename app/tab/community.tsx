@@ -106,7 +106,6 @@ function TabBadge({ count }: { count: number }) {
 }
 
 export default function CommunityScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>("feed");
   // The tutorial's "Message" step lands here with ?tab=messages so the Go
   // button opens the right tab directly instead of the News Feed.
   // ?focusPost (from tapping a post card inside a chat) lands on the feed.
@@ -117,6 +116,13 @@ export default function CommunityScreen() {
     focusPost?: string;
     walkthrough?: string;
   }>();
+  // Start on the tab the URL asked for. Starting at "feed" and switching
+  // a beat later made the screen load the feed first, briefly mark
+  // "viewposts" done, and could unmount the conversations target while
+  // its walkthrough was still measuring it.
+  const [activeTab, setActiveTab] = useState<Tab>(
+    requestedTab === "messages" ? "messages" : "feed"
+  );
   const [posts, setPosts] = useState<Post[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");

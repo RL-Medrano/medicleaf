@@ -15,9 +15,9 @@
  * opens, and the Guide only sends the walkthrough param from an
  * unfinished row — so each sequence plays exactly once per new account.
  *
- * The mockups repeated one placeholder body in both feed cards and had
- * no buttons; the copy below is written per step, and the chrome matches
- * the other walkthroughs (step badge + Skip + Next/Get started).
+ * The feed mockups repeated one placeholder body and had no buttons;
+ * its copy is written per step. The Messages card follows its mockup
+ * (title, one-line body, Get started) exactly.
  */
 import React from "react";
 import CoachWalkthrough, { type CoachStep } from "@/components/CoachWalkthrough";
@@ -62,7 +62,7 @@ const MESSAGES_STEPS: CoachStep[] = [
     footer: "getStarted",
     estHeight: 180,
     title: "Open a conversation",
-    body: "Tap a conversation to open the chat, read everything you've exchanged, and reply. Chats with unread messages show a count so you never miss one.",
+    body: "Open a conversation to read messages and continue chatting.",
   },
 ];
 

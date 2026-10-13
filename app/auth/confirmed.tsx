@@ -1,6 +1,6 @@
 // app/auth/confirmed.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, ActivityIndicator, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -57,7 +57,19 @@ export default function ConfirmedScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 items-center justify-center px-6" style={{ backgroundColor: "#D8F3DC" }}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
+      {/* Centering moved onto the scroll content, so the screen still
+          looks centered on normal phones but can grow + scroll on very
+          short screens or with a large system font size. */}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          paddingHorizontal: 24,
+        }}
+      >
       {status === "working" && (
         <>
           <ActivityIndicator size="large" color="#40916C" />
@@ -102,6 +114,7 @@ export default function ConfirmedScreen() {
           </Pressable>
         </>
       )}
+      </ScrollView>
     </SafeAreaView>
   );
 }

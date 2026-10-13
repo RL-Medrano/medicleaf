@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Pressable, StatusBar, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -118,7 +118,12 @@ export default function ResetPinScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <Text className="text-4xl font-bold mt-6" style={{ color: "#1B4332" }}>
           Set a new PIN
         </Text>
@@ -141,7 +146,7 @@ export default function ResetPinScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

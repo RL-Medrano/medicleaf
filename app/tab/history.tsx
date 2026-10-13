@@ -40,8 +40,9 @@ export default function HistoryScreen() {
   // exactly once per new account.
   const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
-  // The content area below the header is what the step spotlights.
-  const contentRef = useRef<View>(null);
+  // The white header is what the step spotlights — the card then drops
+  // right below it, over the dimmed list area, exactly like the mockup.
+  const headerRef = useRef<View>(null);
 
   useEffect(() => {
     if (walkthrough === "1") setShowWalkthrough(true);
@@ -163,13 +164,13 @@ export default function HistoryScreen() {
       <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
         <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-        <View className="py-4 items-center" style={{ backgroundColor: "#FFFFFF" }}>
+        <View ref={headerRef} className="py-4 items-center" style={{ backgroundColor: "#FFFFFF" }}>
           <Text className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
             History
           </Text>
         </View>
 
-        <View ref={contentRef} className="flex-1">
+        <View className="flex-1">
           {isGuest ? (
             <GuestPrompt message="Create or Log in your account to save and visit your recent scan" />
           ) : (
@@ -251,7 +252,7 @@ export default function HistoryScreen() {
           while the "History" row is unfinished. */}
       {showWalkthrough && (
         <HistoryWalkthrough
-          targets={{ content: contentRef }}
+          targets={{ header: headerRef }}
           onFinish={() => setShowWalkthrough(false)}
         />
       )}

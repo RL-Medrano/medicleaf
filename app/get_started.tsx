@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, Text, Image, Pressable, StatusBar } from "react-native";
+import { View, Text, Image, Pressable, StatusBar, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,7 +27,12 @@ export default function OnboardingEndScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <View className="items-center mt-24">
           <Image
             source={require("@/assets/images/logo/1.png")}
@@ -63,7 +68,7 @@ export default function OnboardingEndScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

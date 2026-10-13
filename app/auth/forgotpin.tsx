@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Image, TextInput, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Image, TextInput, Pressable, StatusBar, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
@@ -63,7 +63,12 @@ export default function ForgotPinScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Image
             source={require("@/assets/images/icons/arrow_left.png")}
@@ -112,7 +117,7 @@ export default function ForgotPinScreen() {
             {loading ? "Sending..." : "Send Reset Link"}
           </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

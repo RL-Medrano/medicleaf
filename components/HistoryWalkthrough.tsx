@@ -21,11 +21,14 @@ import type { CoachWalkthroughProps } from "@/components/CoachWalkthrough";
 type Props = Omit<CoachWalkthroughProps, "steps" | "finishLabel">;
 
 // Copy follows the mockup (it already described this screen accurately).
+// The mockup keeps the white "History" header bright, dims the list, and
+// drops the card right below the header — so the step spotlights the
+// HEADER and the card sits under it ("below"), over the dimmed content.
 const HISTORY_STEPS: CoachStep[] = [
   {
     id: 1,
-    target: "content",
-    card: "above",
+    target: "header",
+    card: "below",
     header: "none",
     footer: "getStarted",
     estHeight: 200,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Image, TextInput, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Image, TextInput, Pressable, StatusBar, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -129,7 +129,12 @@ export default function ChangePasswordScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <Pressable onPress={() => router.back()}>
           <Image
             source={require("@/assets/images/icons/arrow_left.png")}
@@ -225,7 +230,7 @@ export default function ChangePasswordScreen() {
             {loading ? "Updating..." : "Confirm"}
           </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

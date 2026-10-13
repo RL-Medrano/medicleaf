@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Image, Pressable, Alert, StatusBar } from "react-native";
+import { View, Text, Image, Pressable, Alert, StatusBar, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -93,7 +93,12 @@ export default function DeleteAccountScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFFFFF" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <View className="flex-row items-center mt-2">
           <Pressable onPress={() => router.back()}>
             <Image
@@ -163,7 +168,7 @@ export default function DeleteAccountScreen() {
             {loading ? "Deleting..." : "Delete Account"}
           </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

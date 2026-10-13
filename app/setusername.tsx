@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Image, TextInput, Pressable, StatusBar, Alert } from "react-native";
+import { View, Text, Image, TextInput, Pressable, StatusBar, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/utils/supabase";
@@ -105,7 +105,12 @@ export default function SetUsernameScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
 
-      <View className="flex-1 px-6">
+      <ScrollView
+        className="flex-1 px-6"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
         <View className="items-center mt-16">
           <Image
             source={require("@/assets/images/icons/username.png")}
@@ -149,7 +154,7 @@ export default function SetUsernameScreen() {
             {loading ? "Saving..." : "Continue"}
           </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
