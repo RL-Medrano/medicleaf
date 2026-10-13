@@ -40,7 +40,7 @@ import { getAuthState } from "@/utils/guest";
 import { checkIsOnline } from "@/utils/network";
 import { getGeoapifyTileUrlTemplate, getWalkingRoute } from "@/utils/geoapify";
 import { GuestPrompt } from "@/components/GuestPrompt";
-import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
+import { getPlantDetailsBySlug, getDisplayName } from "@/utils/plantClassifier";
 
 const RECENT_SEARCHES_KEY = "map_recent_plant_searches";
 const MAX_RECENT_SEARCHES = 5;
@@ -55,6 +55,11 @@ const BLANK_MAP_STYLE = {
 // the person hasn't started moving yet, or the reading is noisy/near
 // zero). Roughly an average walking pace in m/s.
 const FALLBACK_SPEED_MPS = 1.4;
+
+// Auto-ends navigation once the person is within this many meters of the
+// pinned post — they're standing "on" the destination. Wide enough to
+// absorb normal GPS jitter (±10-15 m), tight enough not to fire early.
+const ARRIVAL_THRESHOLD_METERS = 30;
 
 // Below this, a speed reading is treated as "not moving yet" rather than
 // an actual pace, so we fall back to FALLBACK_SPEED_MPS instead of
@@ -149,6 +154,10 @@ export default function MapScreen() {
   const [frozenCenter, setFrozenCenter] = useState<[number, number] | null>(null);
 
   const watchSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  // True from the moment arrival is detected until the next directions
+  // request — guards against a queued GPS callback firing the arrival
+  // alert twice after the watch has already been removed.
+  const arrivedRef = useRef(false);
   // Timestamp of the last pin press — lets handleMapPress tell a genuine
   // empty-map tap apart from the map press some platforms also fire for
   // a tap that landed on a pin.
@@ -337,6 +346,22 @@ export default function MapScreen() {
       longitude: destination.longitude,
     });
 
+    // Standing on the pin: end the navigation right here, using the exact
+    // same cleanup as the Cancel button (route line, ETA card, GPS watch),
+    // and tell the person why the route disappeared. selectedPost is left
+    // alone, so the pin's bottom card stays open — same as Cancel.
+    if (distance <= ARRIVAL_THRESHOLD_METERS && !arrivedRef.current) {
+      arrivedRef.current = true;
+      clearRoute();
+      Alert.alert(
+        "You've arrived",
+        destination.plant_slug
+          ? `You've reached ${getDisplayName(destination.plant_slug)}.`
+          : "You've reached your destination."
+      );
+      return;
+    }
+
     const speed =
       speedMps !== null && speedMps >= MIN_RELIABLE_SPEED_MPS
         ? speedMps
@@ -374,6 +399,9 @@ export default function MapScreen() {
       return;
     }
 
+    // Fresh navigation — clear any leftover arrival flag from a previous
+    // route so this one can auto-end too.
+    arrivedRef.current = false;
     setRouting(true);
     setFollowingUser(true);
     setFrozenCenter(null);
