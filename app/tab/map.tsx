@@ -22,6 +22,8 @@ import {
   ActivityIndicator,
   TextInput,
   BackHandler,
+  AppState,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -259,23 +261,102 @@ export default function MapScreen() {
       // of failing silently inside getCurrentPositionAsync.
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
+        // Modern-app flow first: ask Google Play Services to show its own
+        // privileged "turn on location" dialog right in the app — the
+        // same one Maps-style apps use. Accepting there flips the device
+        // location switch itself, so there's no trip to Settings. It
+        // rejects when the person declines, and throws on devices
+        // without Google Play Services (rare: some Huawei / China-market
+        // phones), so either way we re-check below and fall back.
+        try {
+          await Location.enableNetworkProviderAsync();
+        } catch {
+          // Declined or unavailable — the re-check below decides.
+        }
+
+        // True once the in-app dialog was accepted (or location turned
+        // out to be on after all); still false means declined / no
+        // Google Play Services → offer the system Location settings.
+        const nowEnabled = await Location.hasServicesEnabledAsync();
+        if (nowEnabled) {
+          await fetchAndSetPosition();
+          return;
+        }
+
+        // Fallback: jump straight to the system Location settings —
+        // having to find that toggle by hand is what made this feel
+        // broken before.
         Alert.alert(
           "Location is turned off",
-          "Turn on location services to show your position and get walking directions."
+          "MedicLeaf can't show your position while your device's location is off. Turn it on and your location appears automatically.",
+          [
+            { text: "Not now", style: "cancel" },
+            {
+              text: "Turn on",
+              onPress: () => {
+                // Android intent for the system Location toggle screen.
+                // sendIntent is Android-only RN core — this app is
+                // Android-only, so no expo-intent-launcher dependency.
+                Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS").catch(
+                  () => {
+                    // Some custom launchers reject the intent — fall back
+                    // to the app's own settings page rather than nothing.
+                    Linking.openSettings();
+                  }
+                );
+              },
+            },
+          ]
         );
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({});
-      setMyLocation({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+      await fetchAndSetPosition();
     } catch (err) {
       // Map still works without a blue dot — pins and search don't need it.
       console.error("[map] failed to read current location:", err);
     }
   }
+
+  async function fetchAndSetPosition() {
+    const position = await Location.getCurrentPositionAsync({});
+    setMyLocation({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    });
+  }
+
+  // Quiet retry used when the app returns to the foreground — typically
+  // right after the "Turn on" button above jumped to the system Location
+  // settings. Coming back does NOT re-run useFocusEffect (the screen never
+  // lost focus), so without this the dot would stay missing until the
+  // person manually revisited the tab. Never requests permission (so
+  // guests — who are never asked — stay unaffected) and never alerts, so
+  // returning without enabling location doesn't nag again.
+  async function retryMyLocationQuietly() {
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (!permission.granted) return;
+
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) return;
+
+      await fetchAndSetPosition();
+    } catch (err) {
+      console.error("[map] quiet location retry failed:", err);
+    }
+  }
+
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      const cameBackToForeground = appStateRef.current !== "active" && next === "active";
+      appStateRef.current = next;
+
+      if (cameBackToForeground) retryMyLocationQuietly();
+    });
+    return () => subscription.remove();
+  }, []);
 
   // If we arrived here with a specific postId (from viewpost.tsx or
   // community.tsx's pin icon), open that pin's bottom card and center

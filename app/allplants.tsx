@@ -32,14 +32,25 @@ const ALL_PLANTS = [...PLANTS].sort((a, b) =>
 export default function AllPlantsScreen() {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<PlantTag | null>(null);
+  // Sort direction for the plant list — A→Z by default, Z→A once the
+  // pill next to "Medicinal Plant List" is tapped.
+  const [sortDesc, setSortDesc] = useState(false);
   const { recentSearches, saveRecentSearch, clearAllRecentSearches } = useRecentSearches();
+
+  // Display order — ALL_PLANTS is the pre-sorted A→Z base; descending is
+  // its reverse, so the letter groups below simply come out backwards.
+  const orderedPlants = useMemo(
+    () => (sortDesc ? [...ALL_PLANTS].reverse() : ALL_PLANTS),
+    [sortDesc]
+  );
 
   // Same live filter as the Search screen: typed text matches a plant's
   // name, scientific name, or tags; an active chip narrows by tag.
+  // Filtering keeps the current A→Z / Z→A order.
   const filteredPlants = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    return ALL_PLANTS.filter((plant) => {
+    return orderedPlants.filter((plant) => {
       const matchesQuery =
         q.length === 0 ||
         plant.name.toLowerCase().includes(q) ||
@@ -50,12 +61,12 @@ export default function AllPlantsScreen() {
 
       return matchesQuery && matchesTag;
     });
-  }, [query, activeTag]);
+  }, [query, activeTag, orderedPlants]);
 
-  // Group the (filtered, still A→Z-sorted) list under its first letter —
-  // the "Medicinal Plant List" section headings in the mockup. The list
-  // is already sorted, so consecutive plants sharing a letter merge into
-  // one group.
+  // Group the (filtered, still alphabetically ordered) list under its
+  // first letter — the "Medicinal Plant List" section headings in the
+  // mockup. Consecutive plants sharing a letter merge into one group, so
+  // descending order just renders the groups Z→A.
   const groupedPlants = useMemo(() => {
     const groups: { letter: string; plants: Plant[] }[] = [];
 
@@ -225,10 +236,30 @@ export default function AllPlantsScreen() {
             })}
           </View>
 
-          {/* Every plant, A→Z, grouped under letter headings — per mockup */}
-          <Text className="font-bold text-base mt-4" style={{ color: "#1B4332" }}>
-            Medicinal Plant List
-          </Text>
+          {/* Every plant, grouped under letter headings — per mockup. The
+              A-Z / Z-A pill flips the list order (and the letter groups
+              come out in reverse when descending). */}
+          <View className="flex-row justify-between items-center mt-4">
+            <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+              Medicinal Plant List
+            </Text>
+            <Pressable
+              onPress={() => setSortDesc((v) => !v)}
+              hitSlop={8}
+              className="flex-row items-center rounded-full border"
+              style={{
+                borderColor: "#1B4332",
+                backgroundColor: "#FFFFFF",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+              }}
+            >
+              <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                {sortDesc ? "Z-A" : "A-Z"}
+              </Text>
+              <Text style={{ color: "#1B4332", fontSize: 10, marginLeft: 4 }}>▾</Text>
+            </Pressable>
+          </View>
           {groupedPlants.map((group) => (
             <View key={group.letter}>
               <Text className="font-bold mt-3 mb-2" style={{ fontSize: 15, color: "#1B4332" }}>
