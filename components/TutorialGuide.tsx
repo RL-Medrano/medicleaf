@@ -35,42 +35,33 @@ export default function TutorialGuide({ state, onToggle }: Props) {
   const percent = Math.round((doneCount / total) * 100);
 
   function goTo(step: TutorialStep) {
-    const isDone = state.done.includes(step.id);
+    // Every Go press replays its walkthrough. The param carries a fresh
+    // timestamp token: expo-router MERGES params on tab routes, so a
+    // plain "1" would keep its old value and the screen's effect would
+    // never re-fire on a second press. Completion state is progress
+    // display only — it no longer gates the tutorial.
+    const walkthrough = Date.now().toString();
 
-    if (step.openMessages) {
+    if (step.id === "viewposts") {
       // Typed routes want a literal pathname for the object form.
-      router.push({ pathname: "/tab/community", params: { tab: "messages" } });
-    } else if (step.id === "scanpost") {
-      // These two screens open with a coach-mark walkthrough on arrival.
-      // Only an UNFINISHED row sends the flag: a completed row's press is
-      // a plain navigation (the screen's own check also guards it).
-      router.push({
-        pathname: "/scan",
-        params: isDone ? undefined : { walkthrough: "1" },
-      });
-    } else if (step.id === "library") {
-      router.push({
-        pathname: "/search",
-        params: isDone ? undefined : { walkthrough: "1" },
-      });
-    } else if (step.id === "viewposts") {
+      // The tab is explicit: without it, a stale tab=messages from an
+      // earlier Message press merges in and lands here on Messages.
       router.push({
         pathname: "/tab/community",
-        params: isDone ? undefined : { walkthrough: "1" },
+        params: { tab: "feed", walkthrough },
       });
-    } else if (step.id === "message") {
+    } else if (step.openMessages) {
       // Message lands on the Messages tab AND runs its walkthrough.
       router.push({
         pathname: "/tab/community",
-        params: isDone
-          ? { tab: "messages" }
-          : { tab: "messages", walkthrough: "1" },
+        params: { tab: "messages", walkthrough },
       });
+    } else if (step.id === "scanpost") {
+      router.push({ pathname: "/scan", params: { walkthrough } });
+    } else if (step.id === "library") {
+      router.push({ pathname: "/search", params: { walkthrough } });
     } else if (step.id === "history") {
-      router.push({
-        pathname: "/tab/history",
-        params: isDone ? undefined : { walkthrough: "1" },
-      });
+      router.push({ pathname: "/tab/history", params: { walkthrough } });
     } else {
       router.push(step.route);
     }

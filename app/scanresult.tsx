@@ -565,14 +565,28 @@ export default function ScanResultScreen() {
           />
         </Pressable>
 
-        {/* Name row — accuracy pill removed per updated mockup */}
-        <View className="mt-4">
-          <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
-            {displayName}
-          </Text>
-          <Text className="mt-0.5" style={{ color: "#6b7280", fontSize: 15 }}>
-            {plant.scientific_name}
-          </Text>
+        {/* Name row — accuracy pill back per updated mockup
+            ("Accuracy: 95%"); hidden only when no confidence value
+            came through (e.g. a very old history entry). */}
+        <View className="mt-4 flex-row items-center">
+          <View className="flex-1 mr-3">
+            <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
+              {displayName}
+            </Text>
+            <Text className="mt-0.5" style={{ color: "#6b7280", fontSize: 15 }}>
+              {plant.scientific_name}
+            </Text>
+          </View>
+          {displayAccuracy !== null && (
+            <View
+              className="rounded-full"
+              style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 10 }}
+            >
+              <Text style={{ color: "#374151", fontSize: 14, fontWeight: "600" }}>
+                Accuracy: {displayAccuracy}%
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Tabs */}

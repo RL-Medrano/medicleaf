@@ -4,16 +4,16 @@
  * The first-run coach-mark walkthroughs over the Community screen
  * (the user's "View Posts" and "Message" walkthrough mockups). Home's
  * Tutorial Guide triggers them:
- *   • Go on "View Posts"  → /tab/community?walkthrough=1          (feed)
- *   • Go on "Message"     → /tab/community?tab=messages&walkthrough=1
+ *   • Go on "View Posts"  → /tab/community?tab=feed&walkthrough=<token>
+ *   • Go on "Message"     → /tab/community?tab=messages&walkthrough=<token>
  *
  * All of the overlay machinery lives in components/CoachWalkthrough.tsx;
  * this file is just the step content for each tab.
  *
  * No persistence happens on finish: app/tab/community.tsx already marks
  * "viewposts" when the feed opens and "message" when the Messages tab
- * opens, and the Guide only sends the walkthrough param from an
- * unfinished row — so each sequence plays exactly once per new account.
+ * opens, and the Guide sends a fresh walkthrough token on every Go
+ * press — so each sequence replays on demand.
  *
  * The feed mockups repeated one placeholder body and had no buttons;
  * its copy is written per step. The Messages card follows its mockup

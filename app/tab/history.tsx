@@ -34,10 +34,9 @@ export default function HistoryScreen() {
   const inFlight = useRef(false);
 
   /* First-run walkthrough (the "Your scan history" mockup) */
-  // The Guide sends ?walkthrough=1 only from an unfinished row, and this
+  // The Guide sends ?walkthrough=<token> on every Go press, and this
   // screen marks the guide's step done on every visit (useFocusEffect
-  // below) — trusting the param avoids racing that write, so it plays
-  // exactly once per new account.
+  // below) — trusting the param avoids racing that write.
   const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   // The white header is what the step spotlights — the card then drops
@@ -45,7 +44,7 @@ export default function HistoryScreen() {
   const headerRef = useRef<View>(null);
 
   useEffect(() => {
-    if (walkthrough === "1") setShowWalkthrough(true);
+    if (walkthrough) setShowWalkthrough(true);
   }, [walkthrough]);
 
   useFocusEffect(

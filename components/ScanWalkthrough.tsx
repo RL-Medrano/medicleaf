@@ -3,9 +3,8 @@
  *
  * The first-run coach-mark walkthrough over the Scan screen (mockups
  * "Scan(tutorial1..4).png"). Home's Tutorial Guide triggers it: pressing
- * Go on "Scan & Post" pushes /scan?walkthrough=1, and the Scan screen
- * mounts this overlay only when utils/tutorial.ts says that account
- * still has the guide unfinished.
+ * Go on "Scan & Post" pushes /scan?walkthrough=<token> — a fresh
+ * timestamp per press, so the sequence replays on demand.
  *
  * All of the overlay machinery lives in components/CoachWalkthrough.tsx;
  * this file is just the Scan screen's step content plus the rule that

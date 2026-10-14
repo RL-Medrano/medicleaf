@@ -4,15 +4,15 @@
  * The first-run coach-mark walkthrough over the Library / Search screen
  * (the user's "Search Medicinal Plant" walkthrough mockups). Home's
  * Tutorial Guide triggers it: pressing Go on "Library" pushes
- * /search?walkthrough=1 while that row is still unfinished.
+ * /search?walkthrough=<token> — a fresh timestamp per press, so the
+ * sequence replays on demand.
  *
  * All of the overlay machinery lives in components/CoachWalkthrough.tsx;
  * this file is just the Search screen's step content.
  *
  * No persistence happens on finish: app/search.tsx already marks the
- * guide's "library" step complete on every visit, and the Guide only
- * sends the walkthrough param from an unfinished row — so the sequence
- * plays exactly once per new account, guests and veterans never see it.
+ * guide's "library" step complete on every visit, and the Guide's token
+ * is what retriggers the overlay.
  *
  * The mockups had the same placeholder body in all three cards; the
  * copy below is written per step so each card describes what it

@@ -129,17 +129,9 @@ export default function PlantDetailScreen() {
           )}
         </View>
 
-        {/* Name + scientific name, with the gallery dots on the right */}
-        <View className="flex-row items-center mt-5">
-          <View className="flex-1 mr-3">
-            <Text style={{ fontSize: 28, fontWeight: "bold", color: "#1A1A1A" }}>
-              {plant.name}
-            </Text>
-            <Text className="mt-0.5" style={{ fontSize: 15, color: "#6b7280" }}>
-              {plant.scientific_name}
-            </Text>
-          </View>
-          {plant.images.length > 1 && (
+        {/* Gallery dots — centered under the hero, per the mockup */}
+        {plant.images.length > 1 && (
+          <View className="flex-row justify-center mt-3">
             <View
               className="flex-row items-center rounded-full px-2.5 py-1.5"
               style={{ backgroundColor: "#FFFFFF" }}
@@ -157,7 +149,24 @@ export default function PlantDetailScreen() {
                 />
               ))}
             </View>
-          )}
+          </View>
+        )}
+
+        {/* Name + scientific name, with the MedicLeaf logo on the right */}
+        <View className="flex-row items-center mt-4">
+          <View className="flex-1 mr-3">
+            <Text style={{ fontSize: 28, fontWeight: "bold", color: "#1A1A1A" }}>
+              {plant.name}
+            </Text>
+            <Text className="mt-0.5" style={{ fontSize: 15, color: "#6b7280" }}>
+              {plant.scientific_name}
+            </Text>
+          </View>
+          <Image
+            source={require("@/assets/images/logo/1.png")}
+            style={{ width: 60, height: 60 }}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Tabs — white rounded bar with an inset active pill, per mockup;

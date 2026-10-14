@@ -2,24 +2,27 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, Text, Image, Pressable, ScrollView, TextInput, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { supabase } from "@/utils/supabase";
-import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
+import useRecentSearches from "@/utils/useRecentSearches";
 import { getRandomPlants, PLANTS, Plant, PlantTag } from "@/data/plants";
 import { CachedPlantImage } from "@/components/CachedPlantImage";
 import SearchWalkthrough from "@/components/SearchWalkthrough";
 
 const DEFAULT_TAGS: PlantTag[] = ["Cough", "Fever", "Indigestion", "Wound", "Diabetes"];
-const MAX_RECENT_SEARCHES = 8;
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<PlantTag | null>(null);
 
-  // Cross-device recent searches (Supabase — logged-in users only)
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isGuestUser, setIsGuestUser] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  // Cross-device recent searches (Supabase — logged-in users only),
+  // shared with the All Plants screen via utils/useRecentSearches.
+  const {
+    recentSearches,
+    isGuestUser,
+    saveRecentSearch,
+    removeRecentSearch,
+    clearAllRecentSearches,
+  } = useRecentSearches();
   const [isFocused, setIsFocused] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -30,11 +33,10 @@ export default function SearchScreen() {
   const previousRecommendIds = useRef<string[]>(recommended.map((plant) => plant.id));
 
   /* First-run walkthrough (the "Search Medicinal Plant" mockups) */
-  // Home's Tutorial Guide pushes /search?walkthrough=1 while the Library
-  // row is unfinished. Unlike Scan, no extra state check is needed here:
-  // the Guide only sends the param from an unfinished row, and this
-  // screen marks the step done on visit anyway (useFocusEffect below) —
-  // re-checking would race that write.
+  // Home's Tutorial Guide pushes /search?walkthrough=<token> on every Go
+  // press — a fresh timestamp, so this effect re-fires per press. This
+  // screen also marks the step done on visit anyway (useFocusEffect
+  // below) — trusting the param avoids racing that write.
   const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -48,16 +50,12 @@ export default function SearchScreen() {
   const recommendationsRef = useRef<View>(null);
 
   useEffect(() => {
-    if (walkthrough === "1") setShowWalkthrough(true);
+    if (walkthrough) setShowWalkthrough(true);
   }, [walkthrough]);
 
   const isSearching = query.trim().length > 0 || activeTag !== null;
   const showRecentDropdown =
     isFocused && query.trim().length === 0 && !activeTag && !isGuestUser && recentSearches.length > 0;
-
-  useEffect(() => {
-    loadUserAndRecentSearches();
-  }, []);
 
   // Every visit: complete the tutorial's "Library" step (no-op for guests
   // and accounts the guide isn't enrolled in) and hand out a fresh set of
@@ -71,97 +69,6 @@ export default function SearchScreen() {
       setRecommended(next);
     }, [])
   );
-
-  // ---------- Cross-device recent searches (Supabase) ----------
-
-  async function loadUserAndRecentSearches() {
-    // getAuthState() also recognises a local guest (no session at all).
-    const { user, isGuest } = await getAuthState();
-    setIsGuestUser(isGuest);
-
-    // Guests aren't logged into an account, so there's nothing to sync
-    // across devices for them — skip loading/saving recent searches.
-    if (!user || isGuest) return;
-
-    setUserId(user.id);
-
-    const { data } = await supabase
-      .from("recent_searches")
-      .select("query")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(MAX_RECENT_SEARCHES);
-
-    if (data) setRecentSearches(data.map((row) => row.query));
-  }
-
-  async function saveRecentSearch(term: string) {
-    const trimmed = term.trim();
-    if (!trimmed) return;
-
-    // Guests are skipped on purpose (nothing to sync), but a signed-in
-    // account that hasn't resolved yet is a bug — make it visible instead
-    // of silently dropping the term.
-    if (!userId) {
-      if (!isGuestUser) {
-        console.warn("[search] recent search NOT saved — userId not loaded");
-      }
-      return;
-    }
-
-    setRecentSearches((prev) =>
-      [trimmed, ...prev.filter((q) => q.toLowerCase() !== trimmed.toLowerCase())].slice(
-        0,
-        MAX_RECENT_SEARCHES
-      )
-    );
-
-    // Delete-then-insert instead of upsert(..., { onConflict: "user_id,query" }).
-    // An ON CONFLICT target only works if the table has a matching UNIQUE
-    // constraint — without one, PostgREST rejects the whole write and the
-    // chip appears (from local state) but is gone on the next visit. This
-    // shape works whether or not that constraint exists, and it also
-    // collapses duplicates already sitting in the table.
-    const { error: deleteError } = await supabase
-      .from("recent_searches")
-      .delete()
-      .eq("user_id", userId)
-      .eq("query", trimmed);
-
-    const { error: insertError } = await supabase.from("recent_searches").insert({
-      user_id: userId,
-      query: trimmed,
-      created_at: new Date().toISOString(),
-    });
-
-    // PostgREST never throws — it returns { error }. Report the whole
-    // object so an RLS rejection or a missing column is identifiable from
-    // the Metro console rather than guessed at.
-    const error = insertError ?? deleteError;
-    if (error) {
-      console.error(
-        "[search] recent search NOT persisted:",
-        JSON.stringify({
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        })
-      );
-    }
-  }
-
-  async function removeRecentSearch(term: string) {
-    setRecentSearches((prev) => prev.filter((q) => q !== term));
-    if (!userId) return;
-    await supabase.from("recent_searches").delete().eq("user_id", userId).eq("query", term);
-  }
-
-  async function clearAllRecentSearches() {
-    setRecentSearches([]);
-    if (!userId) return;
-    await supabase.from("recent_searches").delete().eq("user_id", userId);
-  }
 
   // ---------- Shared search logic ----------
 
@@ -256,7 +163,14 @@ export default function SearchScreen() {
               resizeMode="contain"
             />
           </Pressable>
-          <Text className="text-xl font-bold" style={{ color: "#1B4332" }}>
+          {/* Centered title — the flex-1 + marginRight: 36 (arrow width +
+              its margin) keeps it optically centered despite the back
+              button on the left, same as the All Plants header. */}
+          <Text
+            className="flex-1 text-xl font-bold text-center"
+            style={{ color: "#1B4332", marginRight: 36 }}
+            numberOfLines={1}
+          >
             Search Medicinal Plant
           </Text>
         </View>
@@ -375,7 +289,7 @@ export default function SearchScreen() {
                         Recent Searches
                       </Text>
                       <Pressable onPress={clearAllRecentSearches} hitSlop={8}>
-                        <Text className="text-xs font-semibold" style={{ color: "#1B4332" }}>
+                        <Text className="text-sm font-semibold" style={{ color: "#1B4332" }}>
                           clear
                         </Text>
                       </Pressable>
@@ -405,11 +319,19 @@ export default function SearchScreen() {
                     </View>
                   </View>
 
-                  {/* Recommendations — 5 plants, reshuffled on every visit */}
+                  {/* Recommendations — 5 plants, reshuffled on every visit.
+                      "View all" opens the alphabetical All Plants screen. */}
                   <View ref={recommendationsRef}>
-                    <Text className="font-bold text-base mt-4 mb-2" style={{ color: "#1B4332" }}>
-                      Recommendations
-                    </Text>
+                    <View className="flex-row justify-between items-center mt-4 mb-2">
+                      <Text className="font-bold text-base" style={{ color: "#1B4332" }}>
+                        Recommendations
+                      </Text>
+                      <Pressable onPress={() => router.push("/allplants")} hitSlop={8}>
+                        <Text className="text-sm font-semibold" style={{ color: "#1B4332" }}>
+                          View all
+                        </Text>
+                      </Pressable>
+                    </View>
 
                     {recommended.map((plant) => (
                       <Pressable

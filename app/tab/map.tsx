@@ -185,7 +185,6 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       checkGuestThenLoad();
-      loadMyLocation();
 
       // Stop any live GPS watch if the person navigates away from this
       // screen while a route was active, so it doesn't keep running (and
@@ -206,10 +205,14 @@ export default function MapScreen() {
 
     if (guest || !user) {
       // Same RLS restriction as Community Feed — guests can't read posts.
+      // No location permission either: the guest branch renders
+      // GuestPrompt instead of the map, so a grant would be asked for
+      // and never used.
       setLoading(false);
       return;
     }
 
+    loadMyLocation();
     loadPinnedPosts();
   }
 
@@ -690,23 +693,9 @@ export default function MapScreen() {
               style={{ paddingBottom: 12 }}
               contentContainerStyle={{ gap: 8 }}
             >
-              {/* "All Plants" clears every filter — selected when
-                  nothing is filtered, matching the mockup's first chip. */}
-              <Pressable
-                onPress={() => setActiveFilters([])}
-                className="rounded-full"
-                style={{
-                  backgroundColor: showAllPlants ? "#1B4332" : "#FFFFFF",
-                  borderWidth: 1,
-                  borderColor: showAllPlants ? "#1B4332" : "#D1D5DB",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                }}
-              >
-                <Text style={{ color: showAllPlants ? "#FFFFFF" : "#000000" }}>
-                  All Plants
-                </Text>
-              </Pressable>
+              {/* Recent-search chips only — the mockup has no "All
+                  Plants" chip. With every chip toggled off, showAllPlants
+                  flips back on and the map shows all pins again. */}
               {recentSearches.map((name) => {
                 const isActive = activeFilters.includes(name);
                 return (

@@ -109,8 +109,8 @@ export default function CommunityScreen() {
   // The tutorial's "Message" step lands here with ?tab=messages so the Go
   // button opens the right tab directly instead of the News Feed.
   // ?focusPost (from tapping a post card inside a chat) lands on the feed.
-  // ?walkthrough=1 (from an unfinished Tutorial Guide row) plays this
-  // tab's coach-mark walkthrough — see components/CommunityWalkthrough.
+  // ?walkthrough=<token> (from the Tutorial Guide's Go button) plays
+  // this tab's coach-mark walkthrough — see components/CommunityWalkthrough.
   const { tab: requestedTab, focusPost, walkthrough } = useLocalSearchParams<{
     tab?: string;
     focusPost?: string;
@@ -142,13 +142,19 @@ export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
 
   /* First-run walkthroughs (the "View Posts" / "Message" mockups) */
-  // The Guide sends ?walkthrough=1 only from an unfinished row, and this
+  // The Guide sends ?walkthrough=<token> on every Go press, and this
   // screen marks the step done on visit (useFocusEffect above) — trusting
   // the param avoids racing that write. Shown only after the first load,
   // so the spotlight targets exist.
   const walkthroughVariant: "feed" | "messages" =
     requestedTab === "messages" ? "messages" : "feed";
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  // The walkthrough param MERGES across pushes to this tab route, so its
+  // value can linger unchanged. Store the latest token and run each one
+  // at most once: a fresh token re-runs the overlay (new Go press), a
+  // loading flip or a finished run never brings it back.
+  const [walkthroughToken, setWalkthroughToken] = useState<string | null>(null);
+  const walkthroughShownRef = useRef<string | null>(null);
   // Live scroll bookkeeping for the walkthrough's auto-scroll.
   const walkScrollYRef = useRef(0);
   const walkContentHRef = useRef(0);
@@ -160,8 +166,19 @@ export default function CommunityScreen() {
   const messagesListRef = useRef<FlatList<Conversation>>(null);
 
   useEffect(() => {
-    if (walkthrough === "1" && !loading) setShowWalkthrough(true);
-  }, [walkthrough, loading]);
+    if (walkthrough) setWalkthroughToken(walkthrough);
+  }, [walkthrough]);
+
+  useEffect(() => {
+    if (
+      walkthroughToken &&
+      !loading &&
+      walkthroughShownRef.current !== walkthroughToken
+    ) {
+      walkthroughShownRef.current = walkthroughToken;
+      setShowWalkthrough(true);
+    }
+  }, [walkthroughToken, loading]);
 
   // The active list is the one the engine scrolls (either FlatList).
   const handleWalkthroughScrollTo = useCallback(

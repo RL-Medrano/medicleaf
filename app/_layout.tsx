@@ -46,6 +46,7 @@ export default function RootLayout() {
               <Stack.Screen name="chat/[userid]" />
               <Stack.Screen name="tab" />
               <Stack.Screen name="search" />
+              <Stack.Screen name="allplants" />
               <Stack.Screen name="plantdetail" />
             </Stack>
           </SafeAreaProvider>

@@ -13,7 +13,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import ScanWalkthrough from "@/components/ScanWalkthrough";
-import { shouldShowWalkthrough } from "@/utils/tutorial";
 import {
   type PhotoCoords,
   readExifCoord,
@@ -41,8 +40,8 @@ export default function ScanScreen() {
   const [locating, setLocating] = useState(false);
 
   /* First-run walkthrough (mockups Scan(tutorial1..4).png) */
-  // Home's Tutorial Guide pushes /scan?walkthrough=1; utils/tutorial.ts
-  // decides whether this account should actually see it.
+  // Home's Tutorial Guide pushes /scan?walkthrough=<token> on every Go
+  // press — a fresh timestamp, so this effect re-fires per press.
   const { walkthrough } = useLocalSearchParams<{ walkthrough?: string }>();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -57,14 +56,10 @@ export default function ScanScreen() {
   const tipsRef = useRef<View>(null);
 
   useEffect(() => {
-    if (walkthrough !== "1") return;
-    let alive = true;
-    shouldShowWalkthrough("scanpost").then((show) => {
-      if (alive && show) setShowWalkthrough(true);
-    });
-    return () => {
-      alive = false;
-    };
+    // Any walkthrough token from the Guide runs the overlay — Go now
+    // replays the tutorial on demand (the old shouldShowWalkthrough
+    // gate blocked re-runs for completed steps).
+    if (walkthrough) setShowWalkthrough(true);
   }, [walkthrough]);
 
   async function handleTakePhoto() {

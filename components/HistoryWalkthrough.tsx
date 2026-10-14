@@ -4,15 +4,16 @@
  * The first-run coach-mark walkthrough over the History screen (the
  * user's "Your scan history" walkthrough mockup). Home's Tutorial Guide
  * triggers it: pressing Go on "History" pushes /tab/history?
- * walkthrough=1 while that row is unfinished.
+ * walkthrough=<token> — a fresh timestamp per press, so it replays on
+ * demand.
  *
  * All of the overlay machinery lives in components/CoachWalkthrough.tsx;
  * this file is just the step content. A single card, so no step chrome —
  * exactly like the mockup (title, body, Get started).
  *
  * No persistence happens on finish: app/tab/history.tsx already marks
- * the guide's "history" step on every visit, and the Guide only sends
- * the walkthrough param from an unfinished row — so it plays once.
+ * the guide's "history" step on every visit, and the Guide's token is
+ * what retriggers the overlay.
  */
 import React from "react";
 import CoachWalkthrough, { type CoachStep } from "@/components/CoachWalkthrough";
