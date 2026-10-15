@@ -327,7 +327,7 @@ export default function HomeScreen() {
               </View>
             </Animated.View>
           ) : isGuest ? (
-            <GuestPrompt message="Create or Log in your account to see recent scan" flush />
+            <GuestPrompt message="Create or Log in your account to start saving your scans" flush />
           ) : recentScan ? (
             <Pressable
               onPress={() =>
