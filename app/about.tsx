@@ -35,17 +35,17 @@ export default function AboutScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
-          style={{ position: "absolute", left: 0 }}
+          style={{ position: "absolute", left: 16 }}
         >
           <Image
             source={require("@/assets/images/icons/arrow_left.png")}
-            style={{ width: 24, height: 24 }}
+            style={{ width: 28, height: 28 }}
             resizeMode="contain"
           />
         </Pressable>
         <Text
           maxFontSizeMultiplier={1.2}
-          className="text-lg font-bold"
+          className="text-2xl font-bold"
           style={{ color: "#1A1A1A" }}
         >
           About

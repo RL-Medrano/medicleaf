@@ -155,20 +155,26 @@ export default function SearchScreen() {
       <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
         <StatusBar barStyle="dark-content" />
 
-        <View className="flex-row items-center px-5 mt-4">
-          <Pressable onPress={() => router.back()} className="mr-4">
+        {/* Truly centered title — the arrow is absolutely positioned so
+            the title centers on the full header width. The old flex-1 +
+            marginRight trick shifted left whenever a larger system font
+            made the text truncate, since numberOfLines clips at the end. */}
+        <View className="flex-row items-center justify-center px-5 mt-4">
+          <Pressable
+            onPress={() => router.back()}
+            className="absolute left-5"
+            hitSlop={12}
+          >
             <Image
               source={require("@/assets/images/icons/arrow_left.png")}
               style={{ width: 20, height: 20 }}
               resizeMode="contain"
             />
           </Pressable>
-          {/* Centered title — the flex-1 + marginRight: 36 (arrow width +
-              its margin) keeps it optically centered despite the back
-              button on the left, same as the All Plants header. */}
           <Text
-            className="flex-1 text-xl font-bold text-center"
-            style={{ color: "#1B4332", marginRight: 36 }}
+            maxFontSizeMultiplier={1.2}
+            className="text-xl font-bold text-center"
+            style={{ color: "#1B4332", maxWidth: "80%" }}
             numberOfLines={1}
           >
             Search Medicinal Plant
