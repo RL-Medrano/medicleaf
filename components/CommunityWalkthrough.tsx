@@ -38,7 +38,7 @@ const FEED_STEPS: CoachStep[] = [
     footer: "next",
     estHeight: 200,
     title: "Search for a Specific Discovery",
-    body: "Type a medicinal plant name into the search bar to instantly filter the feed down to the posts about that plant.",
+    body: "Type a medicinal plant name into the search bar to instantly filter posts about that plant.",
   },
   {
     id: 2,

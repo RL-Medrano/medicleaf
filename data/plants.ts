@@ -1584,7 +1584,7 @@ export const PLANTS: Plant[] = [
   {
     id: "yerba-buena",
     name: "Yerba Buena",
-    scientific_name: "Mentha × villosa",
+    scientific_name: "Clinopodium douglasii",
     family: "Lamiaceae (Mint family)",
     imageUrl: cloudinaryUrl("plants/yerba-buena.jpg"),
     images: [cloudinaryUrl("plants/yerba-buena.jpg"), cloudinaryUrl("plants/yerba-buena-2.jpg"), cloudinaryUrl("plants/yerba-buena-3.jpg"), cloudinaryUrl("plants/yerba-buena-4.jpg"), cloudinaryUrl("plants/yerba-buena-5.jpg")],

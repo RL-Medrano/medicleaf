@@ -44,7 +44,7 @@ const SEARCH_STEPS: CoachStep[] = [
     footer: "backNext",
     estHeight: 210,
     title: "Use Recent Searches",
-    body: "The terms you've looked up appear here as chips. Tap one to run that search again instantly, or press clear to remove them all.",
+    body: "The terms you've looked up appear here. Tap one to run that search again instantly, or press clear to remove them all.",
   },
   {
     id: 3,
@@ -55,7 +55,7 @@ const SEARCH_STEPS: CoachStep[] = [
     nextLabel: "Done",
     estHeight: 210,
     title: "Check Recommendations",
-    body: "A quick pick of medicinal plants like Lagundi, Sambong, and Oregano. Tap any card to learn what it's used for.",
+    body: "Discover medicinal plants and learn about their uses, health benefits, and preparation methods.",
   },
 ];
 
