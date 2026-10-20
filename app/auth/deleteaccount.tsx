@@ -6,6 +6,7 @@ import * as SecureStore from "expo-secure-store";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/utils/supabase";
 import { clearPinVerified } from "@/utils/pin";
+import { clearPersistedScanHistory } from "@/utils/scanHistory";
 
 // Must match the keys used by the login screen's "Remember me" feature.
 const SAVED_EMAIL_KEY = "medicleaf_saved_email";
@@ -61,6 +62,10 @@ export default function DeleteAccountScreen() {
       // session — don't ask the server to revoke it. The PIN flag goes too,
       // since the next account on this device must verify its own.
       await clearPinVerified();
+      // Drop the offline disk copy of this account's scan history too —
+      // the account (and its data) no longer exists. (`session` is
+      // guaranteed above.)
+      clearPersistedScanHistory(session.user.id);
       await supabase.auth.signOut({ scope: "local" });
       router.replace("/welcome");
     } catch (err) {

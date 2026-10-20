@@ -6,6 +6,7 @@ import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
 import { checkIsOnline } from "@/utils/network";
 import { clearPinVerified } from "@/utils/pin";
+import { clearPersistedScanHistory } from "@/utils/scanHistory";
 import { GuestPrompt } from "@/components/GuestPrompt";
 import { Skel, SKELETON_RING, useSkeletonPulse } from "@/components/Skel";
 
@@ -80,6 +81,11 @@ export default function ProfileScreen() {
             return;
           }
 
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const signedInUserId = session?.user.id;
+
           const { error } = await supabase.auth.signOut();
           if (error) {
             Alert.alert("Couldn't log out", "Please try again.");
@@ -89,6 +95,9 @@ export default function ProfileScreen() {
           // Wipe the "PIN already entered" flag, so the next person to sign
           // in on this device is asked for it again.
           await clearPinVerified();
+          // Don't leave this member's scan list sitting in the offline disk
+          // cache on a shared device.
+          if (signedInUserId) clearPersistedScanHistory(signedInUserId);
           router.replace("/welcome");
         },
       },

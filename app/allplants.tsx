@@ -274,7 +274,7 @@ export default function AllPlantsScreen() {
                 >
                   <CachedPlantImage
                     plantId={plant.id}
-                    remoteUrl={plant.imageUrl}
+                    source={plant.imageUrl}
                     style={{ width: 96, height: 84, borderRadius: 14 }}
                   />
                   <View className="flex-1 ml-3">

@@ -16,6 +16,7 @@ import {
   fetchScanHistory,
   getScanHistory,
   getStaleScanHistory,
+  hydrateScanHistory,
   type ScanItem,
 } from "@/utils/scanHistory";
 import { GuestPrompt } from "@/components/GuestPrompt";
@@ -80,6 +81,10 @@ export default function HistoryScreen() {
       }
 
       setIsGuest(false);
+
+      // Disk → memory (no-op once loaded this run). This is what keeps
+      // History working after an app restart with no connection.
+      await hydrateScanHistory(user.id);
 
       // Fresh cache (nothing changed, still inside the TTL) → render from
       // memory, zero queries.
@@ -173,6 +178,17 @@ export default function HistoryScreen() {
           {isGuest ? (
             <GuestPrompt message="Create or Log in your account to save and visit your recent scan" />
           ) : (
+            <>
+              {loadFailed && scans.length > 0 && (
+                <View
+                  className="mx-5 mt-3 rounded-lg px-3 py-1.5"
+                  style={{ backgroundColor: "#F3F4F6" }}
+                >
+                  <Text style={{ color: "#6b7280", fontSize: 12, textAlign: "center" }}>
+                    You're offline — showing previously loaded data
+                  </Text>
+                </View>
+              )}
             <FlatList
           data={scans}
           keyExtractor={(item) => item.id}
@@ -243,6 +259,7 @@ export default function HistoryScreen() {
             </Pressable>
           )}
             />
+            </>
           )}
         </View>
       </SafeAreaView>

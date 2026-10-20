@@ -348,7 +348,7 @@ export default function SearchScreen() {
                       >
                         <CachedPlantImage
                           plantId={plant.id}
-                          remoteUrl={plant.imageUrl}
+                          source={plant.imageUrl}
                           style={{ width: 64, height: 64, borderRadius: 12 }}
                         />
                         <View className="flex-1 ml-3">
@@ -382,7 +382,7 @@ export default function SearchScreen() {
                         <View className="flex-row items-center">
                           <CachedPlantImage
                             plantId={plant.id}
-                            remoteUrl={plant.imageUrl}
+                            source={plant.imageUrl}
                             style={{ width: 96, height: 96, borderRadius: 14 }}
                           />
                           <View className="flex-1 ml-3">

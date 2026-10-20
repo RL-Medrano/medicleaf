@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Image,
   ImageStyle,
+  ImageSourcePropType,
   StyleProp,
   Modal,
   Pressable,
@@ -29,20 +30,32 @@ function localFileFor(cacheKey: string) {
 }
 
 /**
- * Resolves a single image to its best available uri: the cached local file
+ * Resolves a remote image to its best available uri: the cached local file
  * if one already exists, otherwise the remote url (while quietly downloading
  * a local copy in the background for next time). `cacheKey` should be
  * unique per image — a plant's single photo can use the plant id directly;
  * a gallery image should use something like `${plantId}-${index}`.
+ * A null `remoteUrl` (bundled asset) resolves to null immediately — the
+ * bundled require() source is rendered directly, no network involved.
  */
-function useCachedUri(cacheKey: string, remoteUrl: string) {
-  const [uri, setUri] = useState(remoteUrl);
+function useCachedUri(cacheKey: string, remoteUrl: string | null) {
+  const [uri, setUri] = useState<string | null>(remoteUrl);
 
   useEffect(() => {
     let isMounted = true;
+    // Bundled assets (require() → remoteUrl === null) need no cache/download.
+    if (remoteUrl === null) {
+      setUri(null);
+      return;
+    }
+
+    // Past the guard, remoteUrl is a plain string — copy it to a const so
+    // the narrowing also applies inside the async closure below.
+    const url: string = remoteUrl;
+
     // Reset to the remote url whenever the target image changes, so a
     // stale cached uri from a previous plant/cacheKey never lingers.
-    setUri(remoteUrl);
+    setUri(url);
 
     async function loadFromCacheOrDownload() {
       try {
@@ -54,7 +67,7 @@ function useCachedUri(cacheKey: string, remoteUrl: string) {
           return;
         }
 
-        const downloaded = await File.downloadFileAsync(remoteUrl, localFile);
+        const downloaded = await File.downloadFileAsync(url, localFile);
         if (isMounted && downloaded.exists) {
           setUri(downloaded.uri);
         }
@@ -73,6 +86,21 @@ function useCachedUri(cacheKey: string, remoteUrl: string) {
   }, [cacheKey, remoteUrl]);
 
   return uri;
+}
+
+/**
+ * Normalizes a plant image source to a plain remote URL, or null when the
+ * source is a bundled asset (require() → number), which loads instantly and
+ * works offline forever with no cache involved.
+ */
+function resolveRemoteUri(source: ImageSourcePropType): string | null {
+  if (typeof source === "number") return null; // bundled asset — no network
+  if (typeof source === "string") return source; // plain URL (legacy/remote)
+  if (Array.isArray(source)) {
+    const first = source[0];
+    return first == null ? null : resolveRemoteUri(first);
+  }
+  return source?.uri ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +143,13 @@ function ImageFallback({ style }: { style?: StyleProp<ImageStyle> }) {
 
 type SingleImageProps = {
   plantId: string;
-  remoteUrl: string;
+  /**
+   * The plant photo: normally a bundled asset from require() (loads
+   * instantly, works offline forever — no cache needed). A remote URL
+   * string / { uri } source is also supported and gets downloaded to local
+   * storage on first load like before.
+   */
+  source: ImageSourcePropType;
   style?: StyleProp<ImageStyle>;
   resizeMode?: "cover" | "contain" | "stretch" | "center";
   /** When true, tapping the image opens it in a fullscreen modal preview. */
@@ -123,30 +157,33 @@ type SingleImageProps = {
 };
 
 /**
- * Renders a single plant photo that works offline after its first
- * successful load. Falls back to a "No image available" placeholder if the
- * image can't be loaded (missing/broken Cloudinary url, no cache, offline
- * with nothing cached yet, etc). Use <CachedPlantImageGallery> instead when
- * a plant has more than one photo to show.
+ * Renders a single plant photo. Bundled assets (the normal case for the
+ * plant library) need no network at all; remote sources are cached to disk
+ * on first successful load so they keep working offline afterwards. Falls
+ * back to a "No image available" placeholder if the image can't be loaded.
+ * Use <CachedPlantImageGallery> instead when a plant has more than one
+ * photo to show.
  */
 export function CachedPlantImage({
   plantId,
-  remoteUrl,
+  source,
   style,
   resizeMode = "cover",
   enableFullscreenPreview = false,
 }: SingleImageProps) {
-  const uri = useCachedUri(plantId, remoteUrl);
+  const remoteUri = resolveRemoteUri(source);
+  const uri = useCachedUri(plantId, remoteUri);
+  const isBundled = typeof source === "number";
   const [hasError, setHasError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Give a fresh image url another chance rather than staying stuck in the
+  // Give a fresh image another chance rather than staying stuck in the
   // error state from a previous plant that reused this component instance.
   useEffect(() => {
     setHasError(false);
-  }, [uri]);
+  }, [uri, source]);
 
-  if (!remoteUrl || hasError) {
+  if (!source || hasError) {
     const fallback = <ImageFallback style={style} />;
     // Fallback isn't tappable into a fullscreen preview — there's nothing to preview.
     return fallback;
@@ -154,7 +191,7 @@ export function CachedPlantImage({
 
   const image = (
     <Image
-      source={{ uri }}
+      source={isBundled ? source : { uri: uri ?? remoteUri ?? "" }}
       style={style}
       resizeMode={resizeMode}
       onError={() => setHasError(true)}
@@ -180,7 +217,11 @@ export function CachedPlantImage({
           style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
           onPress={() => setIsPreviewOpen(false)}
         >
-          <Image source={{ uri }} className="w-full h-[80%]" resizeMode="contain" />
+          <Image
+            source={isBundled ? source : { uri: uri ?? remoteUri ?? "" }}
+            className="w-full h-[80%]"
+            resizeMode="contain"
+          />
           <Pressable
             className="absolute top-[50px] right-5 w-9 h-9 rounded-full justify-center items-center"
             style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
@@ -202,29 +243,32 @@ export function CachedPlantImage({
 
 function GallerySlide({
   cacheKey,
-  remoteUrl,
+  source,
   style,
   resizeMode = "cover",
 }: {
   cacheKey: string;
-  remoteUrl: string;
+  /** Bundled require() asset, or a remote URL string / { uri } source. */
+  source: ImageSourcePropType;
   style?: StyleProp<ImageStyle>;
   resizeMode?: "cover" | "contain";
 }) {
-  const uri = useCachedUri(cacheKey, remoteUrl);
+  const remoteUri = resolveRemoteUri(source);
+  const uri = useCachedUri(cacheKey, remoteUri);
+  const isBundled = typeof source === "number";
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     setHasError(false);
-  }, [uri]);
+  }, [uri, source]);
 
-  if (!remoteUrl || hasError) {
+  if (!source || hasError) {
     return <ImageFallback style={style} />;
   }
 
   return (
     <Image
-      source={{ uri }}
+      source={isBundled ? source : { uri: uri ?? remoteUri ?? "" }}
       style={style}
       resizeMode={resizeMode}
       onError={() => setHasError(true)}
@@ -234,7 +278,7 @@ function GallerySlide({
 
 type GalleryProps = {
   plantId: string;
-  imageUrls: string[]; // 1 to 3 photo urls
+  imageUrls: ImageSourcePropType[]; // bundled requires and/or remote urls
   /** Size of each slide in the inline (non-fullscreen) carousel. */
   slideStyle: StyleProp<ImageStyle>;
   /** Skip the dots under the carousel when the caller renders its own. */
@@ -291,9 +335,9 @@ export function CachedPlantImageGallery({
         onScroll={handleInlineScroll}
         scrollEventThrottle={16}
       >
-        {imageUrls.map((url, index) => (
+        {imageUrls.map((photo, index) => (
           <Pressable key={index} onPress={() => openPreviewAt(index)}>
-            <GallerySlide cacheKey={`${plantId}-${index}`} remoteUrl={url} style={slideStyle} />
+            <GallerySlide cacheKey={`${plantId}-${index}`} source={photo} style={slideStyle} />
           </Pressable>
         ))}
       </ScrollView>
@@ -327,11 +371,11 @@ export function CachedPlantImageGallery({
             contentOffset={{ x: previewIndex * screenWidth, y: 0 }}
             onMomentumScrollEnd={handlePreviewScrollEnd}
           >
-            {imageUrls.map((url, index) => (
+            {imageUrls.map((photo, index) => (
               <GallerySlide
                 key={index}
                 cacheKey={`${plantId}-${index}`}
-                remoteUrl={url}
+                source={photo}
                 style={{ width: screenWidth, height: "100%" }}
                 resizeMode="contain"
               />
@@ -368,10 +412,11 @@ export function CachedPlantImageGallery({
 }
 
 // ---------------------------------------------------------------------------
-// Bulk prefetch (unchanged) — pass PLANTS.map(p => ({ cacheKey: p.id,
-// imageUrl: p.imageUrl })) if you only want thumbnails cached up front, or
-// flatten each plant's `images` array too if you want the full galleries
-// cached from app launch as well.
+// Bulk prefetch — for REMOTE image urls only (bundled plant assets from
+// require() ship inside the app and need no prefetching). Example:
+// await prefetchAllPlantImages(
+//   someImages.map((img, i) => ({ cacheKey: `${img.plantId}-${i}`, imageUrl: img.remoteUrl }))
+// );
 // ---------------------------------------------------------------------------
 
 export async function prefetchAllPlantImages(

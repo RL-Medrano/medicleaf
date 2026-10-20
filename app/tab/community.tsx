@@ -19,6 +19,7 @@ import { supabase } from "@/utils/supabase";
 import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
 import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
+import { shortLocation } from "@/utils/shortLocation";
 import { GuestPrompt } from "@/components/GuestPrompt";
 import CommunityWalkthrough from "@/components/CommunityWalkthrough";
 
@@ -48,12 +49,14 @@ type Conversation = {
 type Tab = "feed" | "messages";
 
 const FEED_SEEN_KEY = "community_feed_last_seen";
+// Disk copy of the last successfully loaded feed, shown when a refresh
+// fails (offline) — the "Facebook offline" reading cache.
+const FEED_CACHE_KEY = "offline_cache:community_feed";
 
-// Pin icon lives in assets/images/icons/.
-// It's relative to this file: from app/tab/community.tsx,
+// Icons live in assets/images/icons/.
+// They're relative to this file: from app/tab/community.tsx,
 // "../../assets/..." reaches the project root.
 const ICONS = {
-  pin: require("../../assets/images/icons/pin.png"),
   search: require("../../assets/images/icons/search.png"),
   placeholder: require("../../assets/images/icons/place_holder.png"),
   send: require("../../assets/images/icons/send icon.png"),
@@ -124,6 +127,8 @@ export default function CommunityScreen() {
     requestedTab === "messages" ? "messages" : "feed"
   );
   const [posts, setPosts] = useState<Post[]>([]);
+  // True when the feed on screen came from the offline disk copy.
+  const [showingCachedFeed, setShowingCachedFeed] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -360,21 +365,58 @@ export default function CommunityScreen() {
   async function loadPosts() {
     setLoading(true);
 
-    let query = supabase
-      .from("posts")
-      .select(
-        "id, name, plant_slug, caption, image_url, location_name, latitude, longitude, created_at, user_id, profiles(username, avatar_url)"
-      )
-      .order("created_at", { ascending: false });
+    let fetched: Post[] | null = null;
+    let fetchFailed = false;
+    try {
+      let query = supabase
+        .from("posts")
+        .select(
+          "id, name, plant_slug, caption, image_url, location_name, latitude, longitude, created_at, user_id, profiles(username, avatar_url)"
+        )
+        .order("created_at", { ascending: false });
 
-    if (searchQuery.trim()) {
-      query = query.ilike("name", `%${searchQuery.trim()}%`);
+      if (searchQuery.trim()) {
+        query = query.ilike("name", `%${searchQuery.trim()}%`);
+      }
+
+      const { data, error } = await query.limit(50);
+      if (!error && data) {
+        fetched = data as unknown as Post[];
+      } else {
+        fetchFailed = true;
+      }
+    } catch {
+      // Network failure — the Supabase client rejects instead of returning
+      // an error object, which used to leave the spinner stuck forever.
+      fetchFailed = true;
     }
 
-    const { data, error } = await query.limit(50);
-
-    if (!error && data) {
-      setPosts(data as unknown as Post[]);
+    if (fetched) {
+      setPosts(fetched);
+      setShowingCachedFeed(false);
+      // Mirror full, unfiltered loads to disk so the feed survives an app
+      // restart with no connection. Search results are never cached —
+      // they'd masquerade as the whole feed later.
+      if (!searchQuery.trim()) {
+        try {
+          await AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(fetched));
+        } catch {
+          // Best-effort — never block the UI on a cache write.
+        }
+      }
+    } else if (fetchFailed && !searchQuery.trim()) {
+      // Offline (or the query failed) with nothing new to show — fall back
+      // to the last feed that WAS successfully loaded.
+      try {
+        const raw = await AsyncStorage.getItem(FEED_CACHE_KEY);
+        const cached = raw ? (JSON.parse(raw) as Post[]) : null;
+        if (cached && cached.length > 0) {
+          setPosts(cached);
+          setShowingCachedFeed(true);
+        }
+      } catch {
+        // Unreadable cache — leave whatever is on screen.
+      }
     }
 
     setLoading(false);
@@ -702,12 +744,22 @@ export default function CommunityScreen() {
               onPress={() => handleLocationPress(item)}
               disabled={item.latitude == null || item.longitude == null}
               hitSlop={8}
+              style={{ flexShrink: 1 }}
             >
-              <Image
-                source={ICONS.pin}
-                style={{ width: 22, height: 22 }}
-                resizeMode="contain"
-              />
+              {/* Short "brgy., city, province" form per the mockup — tapping
+                  opens the Map tab, which shows the FULL address. */}
+              <Text
+                className="underline"
+                numberOfLines={1}
+                style={{
+                  color: "#6b7280",
+                  fontSize: 13,
+                  flexShrink: 1,
+                  textAlign: "right",
+                }}
+              >
+                {shortLocation(item.location_name)}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -794,6 +846,18 @@ export default function CommunityScreen() {
                 resizeMode="contain"
               />
             </View>
+          </View>
+        )}
+
+        {/* Offline fallback note — only when serving the saved feed */}
+        {!isGuest && activeTab === "feed" && showingCachedFeed && (
+          <View
+            className="mx-5 mt-2 rounded-lg px-3 py-1.5"
+            style={{ backgroundColor: "#F3F4F6" }}
+          >
+            <Text style={{ color: "#6b7280", fontSize: 12, textAlign: "center" }}>
+              You're offline — showing previously loaded data
+            </Text>
           </View>
         )}
 

@@ -447,7 +447,7 @@ export default function HomeScreen() {
               >
                 <CachedPlantImage
                   plantId={plant.id}
-                  remoteUrl={plant.imageUrl}
+                  source={plant.imageUrl}
                   style={{ width: "100%", height: 90, borderRadius: 10 }}
                 />
                 <Text
