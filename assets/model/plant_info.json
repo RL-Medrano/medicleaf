@@ -1,6 +1,12 @@
 {
   "akapulko": {
     "scientific_name": "Senna alata",
+    "traits": [
+      "Yellow candle flowers",
+      "Paired round leaflets",
+      "Tall erect shrub",
+      "Long flat pods"
+    ],
     "about": "Akapulko (Senna alata) is a medicinal plant traditionally used for common fungal skin infections. Its leaves are commonly prepared for external application to affected areas and are associated with traditional care for conditions such as ringworm and athlete's foot, particularly when itching and other skin irritation are present.",
     "benefits": [
       "Helps manage fungal skin infections",
@@ -14,6 +20,12 @@
   },
   "alagao": {
     "scientific_name": "Premna odorata",
+    "traits": [
+      "Sharp-scented leaves",
+      "Broad oval leaves",
+      "Small tree",
+      "Tiny white flowers"
+    ],
     "about": "Alagao (Premna odorata) is a traditional medicinal plant commonly associated with respiratory and digestive-related herbal preparations. It has been used traditionally for concerns such as cough, fever, and respiratory discomfort, with its leaves commonly prepared as a tea or decoction.",
     "benefits": [
       "Helps relieve cough",
@@ -27,6 +39,12 @@
   },
   "aloe-vera": {
     "scientific_name": "Aloe vera",
+    "traits": [
+      "Thick fleshy leaves",
+      "Spiky leaf edges",
+      "Gray-green rosette",
+      "White leaf spots"
+    ],
     "about": "Aloe vera is a well-known medicinal plant valued for the soothing and moisturizing qualities of its leaf gel. The fresh gel is traditionally applied to the skin to help soothe irritation, moisturize dry areas, and support the care of minor wounds and burns.",
     "benefits": [
       "Soothes skin irritation",
@@ -40,6 +58,12 @@
   },
   "ampalaya": {
     "scientific_name": "Momordica charantia",
+    "traits": [
+      "Climbing vine",
+      "Lobed leaves",
+      "Yellow flowers",
+      "Warty fruit"
+    ],
     "about": "Ampalaya (Momordica charantia) is a commonly used medicinal and food plant traditionally associated with blood sugar management and digestive support. Its leaves and fruits are also valued as a source of antioxidants and are commonly incorporated into food or prepared as a herbal tea.",
     "benefits": [
       "Helps regulate blood sugar levels",
@@ -53,6 +77,12 @@
   },
   "Aratiles": {
     "scientific_name": "Muntingia calabura",
+    "traits": [
+      "Serrated leaves",
+      "Tiny red fruit",
+      "Hairy stems",
+      "Slender tree"
+    ],
     "about": "Aratiles (Muntingia calabura), also known as Jamaican cherry or Panama berry, is a small fruit-bearing tree traditionally used in folk medicine for pain relief and respiratory concerns. Its leaves and flowers are commonly prepared as a decoction and are traditionally associated with relieving headaches, colds, and mild inflammation, while the ripe fruit is eaten fresh as a source of nutrients.",
     "benefits": [
       "Helps relieve headaches and mild pain",
@@ -66,6 +96,12 @@
   },
   "atis": {
     "scientific_name": "Annona squamosa",
+    "traits": [
+      "Knobby green fruit",
+      "Glossy oval leaves",
+      "Short bushy tree",
+      "Creamy flowers"
+    ],
     "about": "Atis (Annona squamosa) is a fruit-bearing plant with traditional medicinal uses involving digestive and skin-related concerns. Its leaves have been used in herbal preparations for digestive discomfort, while crushed leaves have also been traditionally applied externally for minor skin concerns.",
     "benefits": [
       "Helps relieve digestive discomfort",
@@ -79,6 +115,12 @@
   },
   "banaba": {
     "scientific_name": "Lagerstroemia speciosa",
+    "traits": [
+      "Purple flower spikes",
+      "Large oval leaves",
+      "Broad crown",
+      "Big capsule fruit"
+    ],
     "about": "Banaba (Lagerstroemia speciosa) is a widely recognized medicinal plant traditionally used in herbal preparations for blood sugar and urinary concerns. Its leaves are commonly prepared as tea or a decoction and are also associated with traditional support for urinary health and fluid balance.",
     "benefits": [
       "Helps manage blood sugar levels",
@@ -92,6 +134,12 @@
   },
   "basil": {
     "scientific_name": "Ocimum basilicum",
+    "traits": [
+      "Aromatic leaves",
+      "Square stems",
+      "Small white flowers",
+      "Opposite leaf pairs"
+    ],
     "about": "Basil (Ocimum basilicum) is an aromatic herb commonly used in food and traditional herbal preparations. Its leaves are traditionally used to support digestion and general wellness, while its pleasant aroma is also associated with calming and relaxing effects.",
     "benefits": [
       "Supports healthy digestion",
@@ -105,6 +153,12 @@
   },
   "bayabas": {
     "scientific_name": "Psidium guajava",
+    "traits": [
+      "Rough red bark",
+      "Peeling pale bark",
+      "White fluffy flowers",
+      "Round green fruit"
+    ],
     "about": "Bayabas (Psidium guajava) is a widely used medicinal and food plant known for its traditional applications in wound care and digestive concerns. Its leaves are commonly boiled and used as a wash for minor wounds or prepared as a decoction, and the plant is traditionally associated with antibacterial properties.",
     "benefits": [
       "Helps disinfect minor wounds",
@@ -118,6 +172,12 @@
   },
   "bignay": {
     "scientific_name": "Antidesma bunius",
+    "traits": [
+      "Clustering berries",
+      "Red to black fruit",
+      "Glossy pointed leaves",
+      "Small shade tree"
+    ],
     "about": "Bignay (Antidesma bunius) is a fruit-bearing plant with traditional uses related to digestive and urinary health. Its ripe fruit is also a source of antioxidants, while the leaves may be prepared as a traditional decoction for herbal use.",
     "benefits": [
       "Supports digestive health",
@@ -131,6 +191,12 @@
   },
   "calamansi": {
     "scientific_name": "Citrus × microcarpa",
+    "traits": [
+      "Tiny round fruit",
+      "Glossy leaves",
+      "Thorny branches",
+      "Bushy small tree"
+    ],
     "about": "Calamansi (Citrus × microcarpa) is a small citrus fruit valued for its vitamin C content and common use in traditional home remedies. It is often prepared as a diluted drink and is traditionally associated with support for coughs, colds, and general immune health.",
     "benefits": [
       "Boosts vitamin C intake",
@@ -144,6 +210,12 @@
   },
   "cassava": {
     "scientific_name": "Manihot esculenta",
+    "traits": [
+      "Palmate leaves",
+      "Woody stalks",
+      "Brown tuber roots",
+      "Tall stems"
+    ],
     "about": "Cassava (Manihot esculenta) is an important root crop that has both nutritional and traditional medicinal uses. Its roots provide carbohydrates and an energy source, while the leaves have also been used traditionally after proper preparation. Thorough cooking and proper preparation are important before consumption.",
     "benefits": [
       "Provides a nutritional energy source",
@@ -157,6 +229,12 @@
   },
   "dayap": {
     "scientific_name": "Citrus × aurantiifolia",
+    "traits": [
+      "Small round lime",
+      "Thorny branches",
+      "Glossy leaves",
+      "Twisting shrub"
+    ],
     "about": "Dayap (Citrus × aurantiifolia) is a citrus plant traditionally used in preparations associated with respiratory and digestive support. Its juice provides vitamin C and may be consumed diluted or incorporated into traditional herbal preparations for concerns such as cough and digestive discomfort.",
     "benefits": [
       "Helps relieve respiratory discomfort",
@@ -170,6 +248,11 @@
   },
   "gumamela": {
     "scientific_name": "Hibiscus rosa-sinensis",
+    "traits": [
+      "Trumpet flowers",
+      "Glossy toothed leaves",
+      "Round bushy shrub"
+    ],
     "about": "Gumamela (Hibiscus rosa-sinensis) is a flowering plant that has long been used in traditional herbal practices. Its leaves and flowers are traditionally prepared for concerns such as fever, cough, and inflammation, including use as a tea or as a crushed-leaf external preparation.",
     "benefits": [
       "Helps reduce fever",
@@ -183,6 +266,12 @@
   },
   "ipil-ipil": {
     "scientific_name": "Leucaena leucocephala",
+    "traits": [
+      "Feathery leaves",
+      "Flat seed pods",
+      "Slender tree",
+      "Fine leaflets"
+    ],
     "about": "Ipil-ipil (Leucaena leucocephala) is a multipurpose plant with several traditional uses, including applications related to wounds and digestive concerns. Its leaves have been prepared as a decoction or crushed for external use, and the plant has also been traditionally associated with antiparasitic applications.",
     "benefits": [
       "Supports wound healing",
@@ -196,6 +285,11 @@
   },
   "kamantigi": {
     "scientific_name": "Impatiens balsamina",
+    "traits": [
+      "Succulent stems",
+      "Pink clustered flowers",
+      "Toothed oval leaves"
+    ],
     "about": "Kamantigi (Impatiens balsamina) is a flowering plant traditionally used in folk medicine for skin-related concerns. Its leaves may be crushed or prepared as an extract for external use and are traditionally associated with soothing irritated skin, managing minor skin infections, and reducing inflammation.",
     "benefits": [
       "Helps manage skin infections",
@@ -209,6 +303,12 @@
   },
   "kamias": {
     "scientific_name": "Averrhoa bilimbi",
+    "traits": [
+      "Finger-like ribbed fruit",
+      "Pinnate leaves",
+      "Small spreading tree",
+      "Red ripe fruit"
+    ],
     "about": "Kamias (Averrhoa bilimbi) is a fruit-bearing plant traditionally used for several household herbal preparations. It has been associated with cough relief, support for healthy blood pressure, and certain skin concerns, with both fruit preparations and leaf decoctions used traditionally.",
     "benefits": [
       "Helps relieve cough",
@@ -222,6 +322,12 @@
   },
   "lagundi": {
     "scientific_name": "Vitex negundo",
+    "traits": [
+      "Five-lobed leaves",
+      "White flower spikes",
+      "Rough square stems",
+      "Tall spreading shrub"
+    ],
     "about": "Lagundi (Vitex negundo) is one of the most widely recognized Philippine medicinal plants traditionally used for respiratory concerns. Its leaves are commonly prepared as a tea or decoction and are associated with relief of coughs and colds, sore throat, and fever, as well as traditional support for respiratory conditions.",
     "benefits": [
       "Helps relieve cough and colds",
@@ -235,6 +341,12 @@
   },
   "madre-de-cacao": {
     "scientific_name": "Gliricidia sepium",
+    "traits": [
+      "Pink pea flowers",
+      "Feathery leaves",
+      "Broad flat pods",
+      "Shade tree"
+    ],
     "about": "Madre de Cacao (Gliricidia sepium) is a plant traditionally used for external skin and wound care. Its leaves may be crushed and applied externally or prepared as a wash, and traditional use associates the plant with support for minor wounds and certain skin infections because of its reported antifungal properties.",
     "benefits": [
       "Helps treat skin infections",
@@ -248,6 +360,12 @@
   },
   "malunggay": {
     "scientific_name": "Moringa oleifera",
+    "traits": [
+      "Feathery compound leaves",
+      "Long ribbed pods",
+      "Slender soft trunk",
+      "Small white flowers"
+    ],
     "about": "Malunggay (Moringa oleifera) is a highly nutritious plant widely valued for its vitamins, minerals, and antioxidant content. Its leaves are commonly eaten as a vegetable or prepared as tea, making the plant an important traditional food source that supports overall nutrition and may help address nutritional deficiencies.",
     "benefits": [
       "Boosts overall nutrition",
@@ -261,6 +379,12 @@
   },
   "manga": {
     "scientific_name": "Mangifera indica",
+    "traits": [
+      "Lance-shaped leaves",
+      "Clustered fruit",
+      "Tall shade tree",
+      "Wide canopy"
+    ],
     "about": "Manga (Mangifera indica) is a familiar fruit tree whose leaves, bark, and fruit have traditional uses. The leaves may be prepared as a decoction for traditional herbal use, while the fruit provides antioxidants and can contribute to a healthy diet; the plant is also traditionally associated with digestive support.",
     "benefits": [
       "Traditionally used for various ailments",
@@ -274,6 +398,12 @@
   },
   "Mangosteen": {
     "scientific_name": "Garcinia mangostana",
+    "traits": [
+      "Thick glossy leaves",
+      "Purple round fruit",
+      "Yellow sap",
+      "Slow dense tree"
+    ],
     "about": "Mangosteen (Garcinia mangostana) is a tropical fruit tree valued both for its edible fruit and for the traditional medicinal use of its rind (pericarp). The rind is traditionally prepared as a decoction and is associated with support for diarrhea and digestive discomfort, while it is also recognized as a rich source of antioxidant compounds believed to help ease inflammation.",
     "benefits": [
       "Supports digestive health and helps relieve diarrhea",
@@ -287,6 +417,12 @@
   },
   "oregano": {
     "scientific_name": "Plectranthus amboinicus",
+    "traits": [
+      "Thick fuzzy leaves",
+      "Aromatic scent",
+      "Fleshy oval leaves",
+      "Low spreading herb"
+    ],
     "about": "Oregano (Plectranthus amboinicus) is an aromatic medicinal herb commonly used in traditional home remedies for respiratory discomfort. Its leaves are traditionally prepared as an extract or chewed fresh and are associated with helping relieve cough, soothe sore throat, and support respiratory health.",
     "benefits": [
       "Helps relieve cough",
@@ -300,6 +436,12 @@
   },
   "pandan": {
     "scientific_name": "Pandanus amaryllifolius",
+    "traits": [
+      "Long blade leaves",
+      "Sweet aroma",
+      "Spiral leaf growth",
+      "Slender stalks"
+    ],
     "about": "Pandan (Pandanus amaryllifolius) is an aromatic plant widely used in cooking and traditional herbal practices. Its leaves are commonly used to add fragrance and flavor to food and may also be prepared as tea, with traditional uses associated with relaxation and digestive support.",
     "benefits": [
       "Promotes relaxation",
@@ -313,6 +455,12 @@
   },
   "pansit-pansitan": {
     "scientific_name": "Peperomia pellucida",
+    "traits": [
+      "Translucent stems",
+      "Heart-shaped leaves",
+      "Succulent herb",
+      "Tiny green flowers"
+    ],
     "about": "Pansit-pansitan (Peperomia pellucida) is a small herb traditionally used for concerns involving uric acid, gout, and joint discomfort. The fresh leaves may be consumed as food or prepared together with the stems as a decoction, and traditional use associates the plant with support for joint health and relief of gout and arthritis symptoms.",
     "benefits": [
       "Helps reduce uric acid levels",
@@ -326,6 +474,12 @@
   },
   "peanut": {
     "scientific_name": "Arachis hypogaea",
+    "traits": [
+      "Paired leaflets",
+      "Yellow pea flowers",
+      "Underground pods",
+      "Low spreading herb"
+    ],
     "about": "Peanut (Arachis hypogaea) is a nutritious legume valued for its protein, healthy fats, and antioxidant content. Although primarily recognized as a food plant, its nutritional value makes it useful for supporting overall dietary needs, and its seeds can be consumed roasted, boiled, or incorporated into various dishes.",
     "benefits": [
       "Provides protein and healthy fats",
@@ -339,6 +493,12 @@
   },
   "pomelo": {
     "scientific_name": "Citrus maxima",
+    "traits": [
+      "Large round fruit",
+      "Thick glossy leaves",
+      "Thorny branches",
+      "Tall citrus tree"
+    ],
     "about": "Pomelo (Citrus maxima) is a large citrus fruit that is a good source of vitamin C and is traditionally valued as part of a healthy diet. Its fruit may be eaten fresh or consumed as juice, with traditional uses associated with supporting immune health and digestion and helping provide vitamin C.",
     "benefits": [
       "Boosts vitamin C intake",
@@ -352,6 +512,11 @@
   },
   "saluyot": {
     "scientific_name": "Corchorus olitorius",
+    "traits": [
+      "Serrated leaves",
+      "Tall slender stems",
+      "Small yellow flowers"
+    ],
     "about": "Saluyot (Corchorus olitorius) is a leafy vegetable that provides vitamins, minerals, and dietary fiber. It is commonly cooked as a vegetable or added to soups and is traditionally valued for supporting digestive health and helping with concerns such as constipation.",
     "benefits": [
       "Supports digestive health",
@@ -365,6 +530,12 @@
   },
   "sambong": {
     "scientific_name": "Blumea balsamifera",
+    "traits": [
+      "Fuzzy soft leaves",
+      "Silver-green color",
+      "Camphor scent",
+      "Upright shrub"
+    ],
     "about": "Sambong (Blumea balsamifera) is a well-known Philippine medicinal plant traditionally used for urinary and kidney-related concerns. Its leaves are commonly prepared as a tea or decoction, and the plant is recognized in traditional use for its diuretic properties and support of urinary tract health.",
     "benefits": [
       "Supports kidney health",
@@ -378,6 +549,11 @@
   },
   "sampaloc": {
     "scientific_name": "Tamarindus indica",
+    "traits": [
+      "Feathery leaves",
+      "Brown pod fruit",
+      "Tall spreading tree"
+    ],
     "about": "Sampaloc (Tamarindus indica) is a fruit-bearing tree commonly used as both a food and traditional medicinal plant. Its ripe fruit pulp is valued for its flavor and antioxidant content and is traditionally used to support digestion and help relieve constipation, including through fruit-based beverages.",
     "benefits": [
       "Supports digestive health",
@@ -391,6 +567,12 @@
   },
   "sampasampalukan": {
     "scientific_name": "Phyllanthus niruri",
+    "traits": [
+      "Chain-like fruit",
+      "Tiny fan leaves",
+      "Slender branches",
+      "Low herb"
+    ],
     "about": "Sampasampalukan (Phyllanthus niruri) is a small medicinal plant traditionally associated with urinary and kidney-related concerns. The whole plant may be prepared as a decoction or used in other herbal preparations, with traditional uses including support for urinary tract health and concerns involving kidney stones.",
     "benefits": [
       "Supports urinary tract health",
@@ -404,6 +586,11 @@
   },
   "siling-labuyo": {
     "scientific_name": "Capsicum frutescens",
+    "traits": [
+      "Tiny red chilies",
+      "Small pointed leaves",
+      "Low bushy plant"
+    ],
     "about": "Siling-labuyo (Capsicum frutescens) is a small, hot chili pepper valued as a food plant and for its traditional medicinal applications. It contains antioxidant compounds and has traditionally been used in preparations associated with pain relief and metabolism, while topical preparations should be used with proper guidance.",
     "benefits": [
       "Rich in antioxidants",
@@ -417,6 +604,11 @@
   },
   "sweet-potato": {
     "scientific_name": "Ipomoea batatas",
+    "traits": [
+      "Heart-shaped leaves",
+      "Trailing vines",
+      "Purple tuber roots"
+    ],
     "about": "Sweet potato (Ipomoea batatas) is a nutritious root crop that provides vitamins, fiber, and antioxidant compounds. Its roots are commonly boiled or steamed, while young leaves can be cooked as vegetables, making the plant useful for supporting nutrition and digestive health.",
     "benefits": [
       "Rich in vitamins and fiber",
@@ -430,6 +622,11 @@
   },
   "takip-kohol": {
     "scientific_name": "Centella asiatica",
+    "traits": [
+      "Round scalloped leaves",
+      "Creeping stems",
+      "Tiny fan flowers"
+    ],
     "about": "Takip-kohol (Centella asiatica) is a traditional medicinal herb commonly associated with wound care, memory, and circulation. Its fresh leaves may be consumed or prepared as tea, and traditional use associates the plant with supporting wound healing, healthy circulation, and memory and focus.",
     "benefits": [
       "Supports wound healing",
@@ -443,6 +640,12 @@
   },
   "tawa-tawa": {
     "scientific_name": "Euphorbia hirta",
+    "traits": [
+      "Hairy stems",
+      "Tiny flower clusters",
+      "Narrow leaves",
+      "Low weed"
+    ],
     "about": "Tawa-tawa (Euphorbia hirta) is a plant traditionally used in Philippine herbal practices for fever and respiratory concerns. The whole plant may be prepared as a decoction, and it has also been used traditionally as supportive herbal medicine for symptoms associated with dengue; it should not be considered a substitute for professional medical care.",
     "benefits": [
       "Helps reduce fever",
@@ -456,6 +659,12 @@
   },
   "tsaang-gubat": {
     "scientific_name": "Ehretia microphylla",
+    "traits": [
+      "Tiny rough leaves",
+      "Thorny twigs",
+      "Dense small shrub",
+      "Small white flowers"
+    ],
     "about": "Tsaang-gubat (Ehretia microphylla) is a medicinal plant recognized for its traditional use in managing digestive and stomach-related discomfort. Its leaves are commonly boiled and prepared as tea or a decoction, with traditional applications including stomach ache, indigestion, and diarrhea.",
     "benefits": [
       "Helps relieve stomach discomfort",
@@ -469,6 +678,12 @@
   },
   "tuba": {
     "scientific_name": "Jatropha curcas",
+    "traits": [
+      "Lobed leaves",
+      "Yellow flowers",
+      "Bean-like pods",
+      "Milky sap"
+    ],
     "about": "Tuba (Jatropha curcas) is a plant with traditional external applications for certain skin conditions and minor wounds. Because the plant can contain toxic compounds, its use requires proper preparation and guidance, and traditional preparations are intended for external use rather than casual consumption.",
     "benefits": [
       "Traditionally used for minor wounds",
@@ -482,6 +697,11 @@
   },
   "turmeric": {
     "scientific_name": "Curcuma longa",
+    "traits": [
+      "Broad blade leaves",
+      "Orange rhizome",
+      "Tall leafy stems"
+    ],
     "about": "Turmeric (Curcuma longa) is a widely used plant and culinary spice known for its traditional anti-inflammatory and antioxidant properties. Its rhizomes can be prepared as tea or used as a spice, and traditional use associates turmeric with support for joint comfort, inflammation, and general immune health.",
     "benefits": [
       "Helps reduce inflammation",
@@ -495,6 +715,11 @@
   },
   "Uray": {
     "scientific_name": "Amaranthus spinosus",
+    "traits": [
+      "Red-green leaves",
+      "Spiny stems",
+      "Red flower plumes"
+    ],
     "about": "Uray (Amaranthus spinosus), also known as spiny amaranth, is a leafy plant used both as a food source and in traditional herbal preparations. Its leaves are commonly cooked as a vegetable or boiled for tea, with traditional use associating the plant with diuretic effects, relief of fever, and support for healthy digestion.",
     "benefits": [
       "Has diuretic properties",
@@ -508,6 +733,11 @@
   },
   "yerba-buena": {
     "scientific_name": "Clinopodium douglasii",
+    "traits": [
+      "Small aromatic leaves",
+      "Creeping stems",
+      "Scented mint"
+    ],
     "about": "Yerba-buena (Clinopodium douglasii) is an aromatic medicinal herb commonly used in traditional remedies for headaches, stomach aches, and minor pain. Its leaves may be prepared as tea, chewed fresh, or crushed for external use, making it a familiar household herb for mild discomfort.",
     "benefits": [
       "Helps relieve headaches",

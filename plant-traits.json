@@ -1,0 +1,392 @@
+[
+  {
+    "name": "Akapulko",
+    "scientific_name": "Senna alata",
+    "traits": [
+      "Yellow candle flowers",
+      "Paired round leaflets",
+      "Tall erect shrub",
+      "Long flat pods"
+    ]
+  },
+  {
+    "name": "Alagao",
+    "scientific_name": "Premna odorata",
+    "traits": [
+      "Sharp-scented leaves",
+      "Broad oval leaves",
+      "Small tree",
+      "Tiny white flowers"
+    ]
+  },
+  {
+    "name": "Aloe Vera",
+    "scientific_name": "Aloe vera",
+    "traits": [
+      "Thick fleshy leaves",
+      "Spiky leaf edges",
+      "Gray-green rosette",
+      "White leaf spots"
+    ]
+  },
+  {
+    "name": "Ampalaya",
+    "scientific_name": "Momordica charantia",
+    "traits": [
+      "Climbing vine",
+      "Lobed leaves",
+      "Yellow flowers",
+      "Warty fruit"
+    ]
+  },
+  {
+    "name": "Aratiles",
+    "scientific_name": "Muntingia calabura",
+    "traits": [
+      "Serrated leaves",
+      "Tiny red fruit",
+      "Hairy stems",
+      "Slender tree"
+    ]
+  },
+  {
+    "name": "Atis",
+    "scientific_name": "Annona squamosa",
+    "traits": [
+      "Knobby green fruit",
+      "Glossy oval leaves",
+      "Short bushy tree",
+      "Creamy flowers"
+    ]
+  },
+  {
+    "name": "Banaba",
+    "scientific_name": "Lagerstroemia speciosa",
+    "traits": [
+      "Purple flower spikes",
+      "Large oval leaves",
+      "Broad crown",
+      "Big capsule fruit"
+    ]
+  },
+  {
+    "name": "Basil",
+    "scientific_name": "Ocimum basilicum",
+    "traits": [
+      "Aromatic leaves",
+      "Square stems",
+      "Small white flowers",
+      "Opposite leaf pairs"
+    ]
+  },
+  {
+    "name": "Bayabas (Guava)",
+    "scientific_name": "Psidium guajava",
+    "traits": [
+      "Rough red bark",
+      "Peeling pale bark",
+      "White fluffy flowers",
+      "Round green fruit"
+    ]
+  },
+  {
+    "name": "Bignay",
+    "scientific_name": "Antidesma bunius",
+    "traits": [
+      "Clustering berries",
+      "Red to black fruit",
+      "Glossy pointed leaves",
+      "Small shade tree"
+    ]
+  },
+  {
+    "name": "Calamansi",
+    "scientific_name": "Citrus × microcarpa",
+    "traits": [
+      "Tiny round fruit",
+      "Glossy leaves",
+      "Thorny branches",
+      "Bushy small tree"
+    ]
+  },
+  {
+    "name": "Cassava",
+    "scientific_name": "Manihot esculenta",
+    "traits": [
+      "Palmate leaves",
+      "Woody stalks",
+      "Brown tuber roots",
+      "Tall stems"
+    ]
+  },
+  {
+    "name": "Dayap",
+    "scientific_name": "Citrus × aurantiifolia",
+    "traits": [
+      "Small round lime",
+      "Thorny branches",
+      "Glossy leaves",
+      "Twisting shrub"
+    ]
+  },
+  {
+    "name": "Gumamela",
+    "scientific_name": "Hibiscus rosa-sinensis",
+    "traits": [
+      "Trumpet flowers",
+      "Glossy toothed leaves",
+      "Round bushy shrub"
+    ]
+  },
+  {
+    "name": "Ipil-Ipil",
+    "scientific_name": "Leucaena leucocephala",
+    "traits": [
+      "Feathery leaves",
+      "Flat seed pods",
+      "Slender tree",
+      "Fine leaflets"
+    ]
+  },
+  {
+    "name": "Kamantigi",
+    "scientific_name": "Impatiens balsamina",
+    "traits": [
+      "Succulent stems",
+      "Pink clustered flowers",
+      "Toothed oval leaves"
+    ]
+  },
+  {
+    "name": "Kamias",
+    "scientific_name": "Averrhoa bilimbi",
+    "traits": [
+      "Finger-like ribbed fruit",
+      "Pinnate leaves",
+      "Small spreading tree",
+      "Red ripe fruit"
+    ]
+  },
+  {
+    "name": "Lagundi",
+    "scientific_name": "Vitex negundo",
+    "traits": [
+      "Five-lobed leaves",
+      "White flower spikes",
+      "Rough square stems",
+      "Tall spreading shrub"
+    ]
+  },
+  {
+    "name": "Madre de Cacao",
+    "scientific_name": "Gliricidia sepium",
+    "traits": [
+      "Pink pea flowers",
+      "Feathery leaves",
+      "Broad flat pods",
+      "Shade tree"
+    ]
+  },
+  {
+    "name": "Malunggay",
+    "scientific_name": "Moringa oleifera",
+    "traits": [
+      "Feathery compound leaves",
+      "Long ribbed pods",
+      "Slender soft trunk",
+      "Small white flowers"
+    ]
+  },
+  {
+    "name": "Manga (Mango)",
+    "scientific_name": "Mangifera indica",
+    "traits": [
+      "Lance-shaped leaves",
+      "Clustered fruit",
+      "Tall shade tree",
+      "Wide canopy"
+    ]
+  },
+  {
+    "name": "Mangosteen",
+    "scientific_name": "Garcinia mangostana",
+    "traits": [
+      "Thick glossy leaves",
+      "Purple round fruit",
+      "Yellow sap",
+      "Slow dense tree"
+    ]
+  },
+  {
+    "name": "Oregano",
+    "scientific_name": "Plectranthus amboinicus",
+    "traits": [
+      "Thick fuzzy leaves",
+      "Aromatic scent",
+      "Fleshy oval leaves",
+      "Low spreading herb"
+    ]
+  },
+  {
+    "name": "Pandan",
+    "scientific_name": "Pandanus amaryllifolius",
+    "traits": [
+      "Long blade leaves",
+      "Sweet aroma",
+      "Spiral leaf growth",
+      "Slender stalks"
+    ]
+  },
+  {
+    "name": "Pansit-Pansitan",
+    "scientific_name": "Peperomia pellucida",
+    "traits": [
+      "Translucent stems",
+      "Heart-shaped leaves",
+      "Succulent herb",
+      "Tiny green flowers"
+    ]
+  },
+  {
+    "name": "Peanut",
+    "scientific_name": "Arachis hypogaea",
+    "traits": [
+      "Paired leaflets",
+      "Yellow pea flowers",
+      "Underground pods",
+      "Low spreading herb"
+    ]
+  },
+  {
+    "name": "Pomelo",
+    "scientific_name": "Citrus maxima",
+    "traits": [
+      "Large round fruit",
+      "Thick glossy leaves",
+      "Thorny branches",
+      "Tall citrus tree"
+    ]
+  },
+  {
+    "name": "Saluyot",
+    "scientific_name": "Corchorus olitorius",
+    "traits": [
+      "Serrated leaves",
+      "Tall slender stems",
+      "Small yellow flowers"
+    ]
+  },
+  {
+    "name": "Sambong",
+    "scientific_name": "Blumea balsamifera",
+    "traits": [
+      "Fuzzy soft leaves",
+      "Silver-green color",
+      "Camphor scent",
+      "Upright shrub"
+    ]
+  },
+  {
+    "name": "Sampaloc",
+    "scientific_name": "Tamarindus indica",
+    "traits": [
+      "Feathery leaves",
+      "Brown pod fruit",
+      "Tall spreading tree"
+    ]
+  },
+  {
+    "name": "Sampasampalukan",
+    "scientific_name": "Phyllanthus niruri",
+    "traits": [
+      "Chain-like fruit",
+      "Tiny fan leaves",
+      "Slender branches",
+      "Low herb"
+    ]
+  },
+  {
+    "name": "Siling Labuyo",
+    "scientific_name": "Capsicum frutescens",
+    "traits": [
+      "Tiny red chilies",
+      "Small pointed leaves",
+      "Low bushy plant"
+    ]
+  },
+  {
+    "name": "Sweet Potato",
+    "scientific_name": "Ipomoea batatas",
+    "traits": [
+      "Heart-shaped leaves",
+      "Trailing vines",
+      "Purple tuber roots"
+    ]
+  },
+  {
+    "name": "Takip-Kohol",
+    "scientific_name": "Centella asiatica",
+    "traits": [
+      "Round scalloped leaves",
+      "Creeping stems",
+      "Tiny fan flowers"
+    ]
+  },
+  {
+    "name": "Tawa-Tawa",
+    "scientific_name": "Euphorbia hirta",
+    "traits": [
+      "Hairy stems",
+      "Tiny flower clusters",
+      "Narrow leaves",
+      "Low weed"
+    ]
+  },
+  {
+    "name": "Tsaang Gubat",
+    "scientific_name": "Ehretia microphylla",
+    "traits": [
+      "Tiny rough leaves",
+      "Thorny twigs",
+      "Dense small shrub",
+      "Small white flowers"
+    ]
+  },
+  {
+    "name": "Tuba",
+    "scientific_name": "Jatropha curcas",
+    "traits": [
+      "Lobed leaves",
+      "Yellow flowers",
+      "Bean-like pods",
+      "Milky sap"
+    ]
+  },
+  {
+    "name": "Turmeric",
+    "scientific_name": "Curcuma longa",
+    "traits": [
+      "Broad blade leaves",
+      "Orange rhizome",
+      "Tall leafy stems"
+    ]
+  },
+  {
+    "name": "Uray",
+    "scientific_name": "Amaranthus spinosus",
+    "traits": [
+      "Red-green leaves",
+      "Spiny stems",
+      "Red flower plumes"
+    ]
+  },
+  {
+    "name": "Yerba Buena",
+    "scientific_name": "Clinopodium douglasii",
+    "traits": [
+      "Small aromatic leaves",
+      "Creeping stems",
+      "Scented mint"
+    ]
+  }
+]

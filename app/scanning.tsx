@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Image, Pressable, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { classifyPlantImage } from "@/utils/plantClassifier";
+import { classifyPlantImage, type SimilarPlant } from "@/utils/plantClassifier";
 import RingLoader from "@/components/RingLoader";
 
 // TODO: change these paths to wherever your icon images are
@@ -91,7 +91,11 @@ export default function ScanningScreen() {
       if (!isActive.current) return;
 
       if (!result.identified || !result.details) {
+        // Brief "Failed to Detect" beat, then straight to Scan Result in
+        // failed mode — the runner-ups ride along for its Similar Plant
+        // button (see goToFailedResult).
         setStatus("unknown");
+        goToFailedResult(uri, result.similar);
         return;
       }
 
@@ -121,12 +125,41 @@ export default function ScanningScreen() {
       }, 600);
     } catch (err) {
       console.error("[scanning] classification failed:", err);
-      if (isActive.current) setStatus("unknown");
+      if (isActive.current) {
+        setStatus("unknown");
+        goToFailedResult(uri, []); // no candidates when the run itself blew up
+      }
     }
   }
 
   function handleRetry() {
     router.back();
+  }
+
+  // The failure path: hold on "Failed to Detect" for a beat (same idea
+  // as the 600ms "Plant Identified" tick above — just long enough to
+  // read the message), then replace with Scan Result in failed mode.
+  // The runner-up candidates ride along as JSON for its Similar Plant
+  // button; the button is simply absent when there are none.
+  function goToFailedResult(uri: string, candidates: SimilarPlant[]) {
+    const now = new Date();
+    setTimeout(() => {
+      if (!isActive.current) return; // they backed out during the flash
+      router.replace({
+        pathname: "/scanresult",
+        params: {
+          failed: "1",
+          similar: candidates.length > 0 ? JSON.stringify(candidates) : "",
+          imageUri: uri,
+          date: now.toISOString().slice(0, 10), // YYYY-MM-DD
+          time: now.toTimeString().slice(0, 5), // HH:MM
+          imageSource: imageSource ?? "",
+          locationDenied: locationDenied ?? "",
+          photoLat: photoLat ?? "",
+          photoLng: photoLng ?? "",
+        },
+      });
+    }, 1000);
   }
 
   return (
@@ -190,18 +223,11 @@ export default function ScanningScreen() {
           </Text>
         </View>
 
-        {/* Failed to detect — keep the way back to scan.tsx so the user can
-            take another photo or upload a different image. */}
-        {status === "unknown" && (
-          <Pressable
-            onPress={handleRetry}
-            className="rounded-full py-3 items-center mt-6"
-            style={{ backgroundColor: "#1B4332" }}
-          >
-            <Text className="text-white font-bold">Try Again</Text>
-          </Pressable>
-        )}
-      </View>
+          {/* Failed to Detect — no buttons here anymore: after the brief
+              beat above, this screen replaces itself with Scan Result in
+              failed mode (Unknown + Failed Scan badge, Similar Plant /
+              Save / Post). The header back arrow stays as the escape. */}
+        </View>
     </SafeAreaView>
   );
 }

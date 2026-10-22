@@ -17,6 +17,13 @@ export default function ChangePasswordScreen() {
   const [verifying, setVerifying] = useState(true);
   const [ready, setReady] = useState(false);
 
+  // Step 1 (old password) is the Profile route. The email-reset link
+  // already proved the user via the emailed code, so it starts at step 2.
+  const [step, setStep] = useState<1 | 2>(params.code ? 2 : 1);
+  const [oldPassword, setOldPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [checkingOld, setCheckingOld] = useState(false);
+
   useEffect(() => {
     verifyAccess();
   }, []);
@@ -57,6 +64,77 @@ export default function ChangePasswordScreen() {
     }
 
     setReady(true);
+  }
+
+  /**
+   * Step 1 (Profile route): prove the old password before showing the form
+   * that actually changes it. Supabase's updateUser() has no "current
+   * password" field, so the proof is a real sign-in with the old password —
+   * success rotates the session tokens (harmless), a wrong password comes
+   * back as the generic "Invalid login credentials".
+   */
+  async function handleConfirmOld() {
+    if (!oldPassword) {
+      Alert.alert("Missing info", "Please enter your old password.");
+      return;
+    }
+
+    setCheckingOld(true);
+    try {
+      const online = await checkIsOnline();
+      if (!online) {
+        Alert.alert("You're offline", "Connect to the internet to confirm your password.");
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.email) {
+        Alert.alert("Session expired", "Your session has expired. Please sign in again.");
+        router.replace("/auth/login");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: session.user.email,
+        password: oldPassword,
+      });
+
+      if (error) {
+        // Repeated wrong tries hit a server-side rate limit, which answers
+        // with its own message — don't hide that behind the friendly text.
+        const rateLimited = /rate limit|security purposes/i.test(error.message ?? "");
+        Alert.alert(
+          rateLimited ? "Too many attempts" : "Incorrect password",
+          rateLimited
+            ? error.message
+            : "Please check your old password and try again."
+        );
+        return;
+      }
+
+      // Verified — drop the typed old password and move on. Step 2's back
+      // arrow returns here in case they want to re-enter it.
+      setOldPassword("");
+      setShowOldPassword(false);
+      setStep(2);
+    } catch (err) {
+      console.error("[changepassword] old-password check failed:", err);
+      Alert.alert("Something went wrong", "Couldn't confirm your password. Please try again.");
+    } finally {
+      setCheckingOld(false);
+    }
+  }
+
+  function handleBack() {
+    // Step 2 was reached from step 1 inside this screen (Profile route),
+    // so back returns to the old-password check instead of leaving.
+    if (step === 2 && !params.code) {
+      setStep(1);
+      return;
+    }
+    router.back();
   }
 
   async function handleConfirm() {
@@ -125,6 +203,101 @@ export default function ChangePasswordScreen() {
     return null; // already redirected in verifyAccess()
   }
 
+  // ── Step 1: old-password check (Profile route only) ──────────────────
+  if (step === 1) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
+
+        <ScrollView
+          className="flex-1 px-6"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <Pressable onPress={handleBack}>
+            <Image
+              source={require("@/assets/images/icons/arrow_left.png")}
+              style={{ width: 24, height: 24 }}
+              resizeMode="contain"
+            />
+          </Pressable>
+
+          <Text className="text-4xl font-bold mt-4" style={{ color: "#1A1A1A" }}>
+            Confirm Password
+          </Text>
+          <Text className="text-sm mt-2" style={{ color: "#6b7280" }}>
+            Please enter your old password
+          </Text>
+
+          <View className="mt-8">
+            <Text className="font-bold mb-2" style={{ color: "#1A1A1A" }}>
+              Old Password
+            </Text>
+            <View
+              className="rounded-xl px-4 py-3.5 flex-row items-center justify-between"
+              style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" }}
+            >
+              <TextInput
+                value={oldPassword}
+                onChangeText={setOldPassword}
+                secureTextEntry={!showOldPassword}
+                // "password" (not "password-new") so the keyboard offers
+                // the saved password for autofill of the OLD one.
+                autoComplete="password"
+                placeholder="Enter old password"
+                placeholderTextColor="#9CA3AF"
+                style={{ flex: 1, color: "#1A1A1A", padding: 0 }}
+              />
+              <Pressable
+                onPress={() => setShowOldPassword(!showOldPassword)}
+                hitSlop={10}
+                className="ml-3"
+              >
+                <Image
+                  source={
+                    showOldPassword
+                      ? require("@/assets/images/icons/eye_on.png")
+                      : require("@/assets/images/icons/eye_off.png")
+                  }
+                  style={{ width: 22, height: 22 }}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            </View>
+
+            {/* Escape hatch: forgot the old password → prove via the reset
+                email instead; the emailed link re-opens this screen at
+                step 2 ("Reset Password") without needing it. */}
+            <Pressable
+              onPress={() => router.push("/auth/forgotpassword")}
+              hitSlop={8}
+              className="mt-3 self-start"
+            >
+              <Text className="font-semibold text-sm underline" style={{ color: "#2D6A4F" }}>
+                Forgot password
+              </Text>
+            </Pressable>
+          </View>
+
+          <View className="flex-1" />
+
+          <Pressable
+            onPress={handleConfirmOld}
+            disabled={checkingOld}
+            className="rounded-2xl py-4 items-center mb-6"
+            style={{ backgroundColor: "#1B5E20", opacity: checkingOld ? 0.6 : 1 }}
+          >
+            <Text className="text-white font-bold text-base">
+              {checkingOld ? "Checking..." : "Confirm"}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Step 2: set the new password (Profile route and email-reset link) ─
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
@@ -135,7 +308,7 @@ export default function ChangePasswordScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={handleBack}>
           <Image
             source={require("@/assets/images/icons/arrow_left.png")}
             style={{ width: 24, height: 24 }}

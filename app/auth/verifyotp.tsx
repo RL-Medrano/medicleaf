@@ -40,7 +40,9 @@ export default function VerifyOtpScreen() {
     }
 
     // Supabase has now issued the session — this is the real, verified
-    // login. Home is the landing spot from here.
+    // login. Home is the landing spot from here, and the auth history is
+    // cleared so back from Home can't walk into a finished login.
+    router.dismissAll();
     router.replace("/tab/home");
   }
 

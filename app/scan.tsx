@@ -34,8 +34,8 @@ export default function ScanScreen() {
   const [imageSource, setImageSource] = useState<ImageSource | null>(null);
   const [photoCoords, setPhotoCoords] = useState<PhotoCoords | null>(null);
   // True when the camera photo carries no location purely because the user
-  // refused location permission — Scan Result uses this to ask once more
-  // when they go to post (rather than silently posting without a pin).
+  // refused location permission — it drives the "Location access is off"
+  // message under the preview (Scan Result's popup is what offers the fix).
   const [locationDenied, setLocationDenied] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -136,8 +136,9 @@ export default function ScanScreen() {
     setImageSource("library");
     setLocationDenied(false);
     // The device's current position is deliberately NOT used here — an old
-    // photo's location can only come from its own EXIF. With no EXIF GPS,
-    // Scan Result blocks posting and offers Save / Go to Library instead.
+    // photo's location can only come from its own EXIF. With no EXIF GPS
+    // the scan simply carries no location: posting is allowed, and since
+    // the maps are view-only nobody can pin one later either.
     setPhotoCoords(readExifCoord(asset.exif));
   }
 
@@ -153,7 +154,7 @@ export default function ScanScreen() {
         imageUri,
         imageSource: imageSource ?? "",
         // "1" when the photo has no location purely because the user
-        // refused permission — Scan Result asks them once more on Post.
+        // refused permission — noted in the message under the preview.
         locationDenied: locationDenied ? "1" : "",
         ...coordsToParams(photoCoords),
       },

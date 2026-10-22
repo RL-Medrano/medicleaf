@@ -20,6 +20,7 @@ import { getAuthState } from "@/utils/guest";
 import { markTutorialStep } from "@/utils/tutorial";
 import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
 import { shortLocation } from "@/utils/shortLocation";
+import { CommentsSheet } from "@/components/CommentsSheet";
 import { GuestPrompt } from "@/components/GuestPrompt";
 import CommunityWalkthrough from "@/components/CommunityWalkthrough";
 
@@ -60,6 +61,8 @@ const ICONS = {
   search: require("../../assets/images/icons/search.png"),
   placeholder: require("../../assets/images/icons/place_holder.png"),
   send: require("../../assets/images/icons/send icon.png"),
+  // Comment bubble on a feed card → opens the Comments sheet.
+  comment: require("../../assets/images/icons/Message.png"),
 };
 
 // Avatar shown when the user has no profile picture (mockup: place_holder.png).
@@ -144,6 +147,8 @@ export default function CommunityScreen() {
   const focusHandledRef = useRef<string | null>(null);
   // Full-screen viewer — tapping a photo in a feed post opens it here.
   const [viewerUri, setViewerUri] = useState<string | null>(null);
+  // The Comments sheet — which post's comments are open, if any.
+  const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   /* First-run walkthroughs (the "View Posts" / "Message" mockups) */
@@ -698,6 +703,21 @@ export default function CommunityScreen() {
                 `(${getPlantDetailsBySlug(item.plant_slug)!.scientific_name})`}
             </Text>
           </View>
+
+          {/* Comment bubble (mockup: top-right of the card) — opens the
+              Comments sheet for this post. Only reachable signed-in: for
+              guests the whole feed is replaced by GuestPrompt. */}
+          <Pressable
+            onPress={() => setCommentsPostId(item.id)}
+            hitSlop={10}
+            className="ml-2"
+          >
+            <Image
+              source={ICONS.comment}
+              style={{ width: 26, height: 26, tintColor: "#1A1A1A" }}
+              resizeMode="contain"
+            />
+          </Pressable>
         </View>
 
         <Text className="mt-3" style={{ color: "#1A1A1A", fontSize: 15 }}>
@@ -978,6 +998,23 @@ export default function CommunityScreen() {
           </Pressable>
         </View>
         </Modal>
+
+        {/* Comments sheet — the card's comment bubble opens it. A row's
+            paper-plane hands off to the existing chat screen with this
+            post attached, and that screen auto-shares the post card (the
+            same mechanic as the feed's "Send Message" button). */}
+        <CommentsSheet
+          visible={commentsPostId !== null}
+          postId={commentsPostId}
+          currentUserId={currentUserId}
+          onClose={() => setCommentsPostId(null)}
+          onSendToChat={(userId, username) => {
+            // Capture before clearing — goToChat needs the post id.
+            const postId = commentsPostId;
+            setCommentsPostId(null);
+            if (postId) goToChat(userId, username, postId);
+          }}
+        />
       </View>
       </SafeAreaView>
 

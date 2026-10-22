@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import PinMap from "@/components/PinMap";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
+import { reverseGeocode } from "@/utils/geoapify";
 import { getPlantDetailsBySlug } from "@/utils/plantClassifier";
 
 // Icons live in assets/images/icons/
@@ -47,18 +48,32 @@ export default function EditPostScreen() {
   const [saving, setSaving] = useState(false);
 
   const [caption, setCaption] = useState("");
-  // The post's own location — display only. It was fixed when the photo
-  // was taken (or read from its EXIF) and can't be edited here.
+  // The post's pin — starts at the photo's own spot (or wherever it was
+  // last saved); a tap on the map moves it (or drops the first one when
+  // this post never had a location), and Save writes it back with its
+  // freshly resolved label.
   const [coord, setCoord] = useState<Coord | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Full-screen viewer — tapping the post image opens it here.
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
-  // Does the form still hold anything the database doesn't have yet?
-  // The caption is the only editable field, so it alone counts — it is
-  // trimmed and an empty caption is stored as null.
-  const dirty = post != null && (caption.trim() || null) !== (post.caption ?? null);
+  // Monotonic id for "the location the label belongs to" — same guard as
+  // Create Post: a slow geocode for an older pin must never overwrite the
+  // name next to the current one (or be saved with mismatched coords).
+  const locationSeq = useRef(0);
+
+  // Does the form still hold anything the database doesn't have yet? The
+  // caption (trimmed; an empty caption is stored as null) and the pin's
+  // position — both, since either one can change before saving.
+  const captionChanged = post != null && (caption.trim() || null) !== (post.caption ?? null);
+  const locationChanged =
+    post != null &&
+    (((coord?.latitude ?? null) !== (post.latitude ?? null)) ||
+      ((coord?.longitude ?? null) !== (post.longitude ?? null)));
+  const dirty = captionChanged || locationChanged;
 
   useEffect(() => {
     loadPost();
@@ -102,12 +117,46 @@ export default function EditPostScreen() {
     setPost(p);
     setCaption(p.caption ?? "");
 
-    // Fixed location, shown read-only on the map below.
+    // Starting pin: the photo's own spot, under the map below (or none —
+    // the map then offers to place the first one).
     if (p.latitude != null && p.longitude != null) {
       setCoord({ latitude: p.latitude, longitude: p.longitude });
     }
+    setLocationName(p.location_name);
 
     setLoading(false);
+  }
+
+  /**
+   * Reverse-geocodes `coords` into locationName, keyed on locationSeq so
+   * only the most recent request may write state — the same guard as
+   * Create Post, so a slow response for an old pin can never leave a
+   * stale name next to the current one.
+   */
+  async function resolveLocationName(coords: Coord) {
+    const seq = ++locationSeq.current;
+    setGeocoding(true);
+    setLocationName(null);
+
+    try {
+      const geocoded = await reverseGeocode(coords.latitude, coords.longitude);
+      if (seq !== locationSeq.current) return; // a newer pin is being labelled
+      setLocationName(geocoded.formatted);
+    } catch (err) {
+      if (seq !== locationSeq.current) return;
+      console.error("[editpost] reverse geocode failed:", err);
+      setLocationName("Unknown location");
+    } finally {
+      if (seq === locationSeq.current) setGeocoding(false);
+    }
+  }
+
+  // Single tap on the map (inline or full screen) moves the pin to the
+  // tapped point and re-resolves its address label — or drops the first
+  // pin when this post never had a location.
+  function handlePinChange(coords: Coord) {
+    setCoord(coords);
+    resolveLocationName(coords);
   }
 
   // Leaving is only allowed straight away when nothing is pending —
@@ -121,6 +170,17 @@ export default function EditPostScreen() {
   async function handleSave() {
     if (!post || saving) return;
 
+    // Never save a pin while its label is still being resolved — the
+    // location_name must always match the latitude/longitude stored with
+    // it (same guard as Create Post).
+    if (coord && geocoding) {
+      Alert.alert(
+        "Naming this spot",
+        "Hang on a moment while we name this location, then tap Save again."
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const online = await checkIsOnline();
@@ -129,12 +189,18 @@ export default function EditPostScreen() {
         return;
       }
 
-      // Caption only — the photo and its location were fixed when the scan
-      // was made, so nothing else is ever written. created_at is never
-      // touched either, so the post keeps its original date and time.
+      // Caption and location — the photo itself is never touched, and
+      // created_at is never written either, so the post keeps its
+      // original date and time. Coord and label travel together, guarded
+      // above so they can never disagree.
       const { error } = await supabase
         .from("posts")
-        .update({ caption: caption.trim() || null })
+        .update({
+          caption: caption.trim() || null,
+          latitude: coord ? coord.latitude : null,
+          longitude: coord ? coord.longitude : null,
+          location_name: coord ? locationName : null,
+        })
         .eq("id", post.id);
       if (error) throw error;
 
@@ -158,6 +224,9 @@ export default function EditPostScreen() {
   const scientificName = post.plant_slug
     ? getPlantDetailsBySlug(post.plant_slug)?.scientific_name
     : null;
+  // The pin's label is still being fetched — Save waits for it so the
+  // stored location_name can never disagree with the stored coordinates.
+  const naming = coord != null && geocoding;
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
@@ -204,7 +273,7 @@ export default function EditPostScreen() {
             </View>
           </View>
 
-          {/* Caption — the only editable field on this screen */}
+          {/* Caption */}
           <Text className="font-bold mt-4" style={{ color: "#000000" }}>
             Say something
           </Text>
@@ -225,39 +294,53 @@ export default function EditPostScreen() {
             }}
           />
 
-          {/* Location — the photo's own spot, fixed when it was taken.
-              Read-only: the pin can't be dropped, moved or removed. */}
+          {/* Location — starts at the photo's own spot; a tap anywhere on
+              the map moves the pin there (or adds the first one when this
+              post never had a location). */}
           <Text className="font-bold mt-4" style={{ color: "#000000" }}>
             Where did you find it?
           </Text>
           <Text className="text-xs" style={{ color: "#6b7280" }}>
-            Double-tap to view the map full screen
+            {coord
+              ? "Tap the map to move the pin — double-tap to view it full screen"
+              : "Tap the map to place the pin — double-tap to view it full screen"}
           </Text>
 
-          {coord ? (
-            <>
-              <PinMap coord={coord} zoom={15} height={170} borderRadius={20} style={{ marginTop: 8 }} />
-              {post.location_name ? (
-                <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-                  {post.location_name}
-                </Text>
-              ) : null}
-            </>
-          ) : (
+          <PinMap
+            coord={coord}
+            onPinChange={handlePinChange}
+            zoom={coord ? 15 : 5}
+            height={170}
+            borderRadius={20}
+            style={{ marginTop: 8 }}
+          />
+          {locationName ? (
             <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-              This post doesn't include a location.
+              {locationName}
+            </Text>
+          ) : geocoding ? (
+            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+              Naming this spot...
+            </Text>
+          ) : coord ? null : (
+            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+              This post doesn't include a location — tap the map to add one.
             </Text>
           )}
 
           {/* Save */}
           <Pressable
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || naming}
             className="rounded-xl items-center justify-center mt-8"
-            style={{ backgroundColor: "#137425", height: 44, opacity: saving ? 0.6 : 1 }}
+            style={{ backgroundColor: "#137425", height: 44, opacity: saving || naming ? 0.6 : 1 }}
           >
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
+            ) : naming ? (
+              <Text className="text-white" style={{ fontSize: 16 }}>
+                Naming this spot...
+              </Text>
             ) : (
               <Text className="text-white" style={{ fontSize: 16 }}>
                 Save

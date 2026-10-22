@@ -1,16 +1,18 @@
 /**
  * app/createpost.tsx
  *
- * The map lives in components/PinMap.tsx (shared with Edit Post) and is
- * VIEW-ONLY here: it shows the photo's own location — the capture-time GPS
- * fix for a camera shot, the EXIF GPS for a gallery upload — which travels
- * with the scan through router params (falling back to the latitude /
- * longitude stored on the scans row). Double-tap opens it full screen;
- * there is no dropping or moving the pin.
+ * The map lives in components/PinMap.tsx (shared with Edit Post). It
+ * starts on the photo's own location — the capture-time GPS fix for a
+ * camera shot, the EXIF GPS for a gallery upload — which travels with the
+ * scan through router params (falling back to the latitude / longitude
+ * stored on the scans row). A single tap anywhere on the map drops or
+ * moves the pin (or adds the first one when the photo had no location at
+ * all); double-tap opens the map full screen first.
  *
- * The caption is the only thing the user can change. The device's current
- * position is never used: pinning "wherever the user is now" would put a
- * photo taken somewhere else days ago on the wrong spot entirely.
+ * The device's current position is never used: pinning "wherever the user
+ * is now" would put a photo taken somewhere else days ago on the wrong
+ * spot entirely. The caption and the pin are the only things the user can
+ * change before posting.
  *
  * No API key needed — MapLibre is fully open-source, Geoapify tiles are
  * supplied via RasterSource using the URL template from utils/geoapify.ts.
@@ -61,15 +63,18 @@ export default function CreatePostScreen() {
   const [pin, setPin] = useState<Coordinates | null>(null);
   const [locationName, setLocationName] = useState<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
+  // Set when the user taps the map to place or move the pin — it makes
+  // the draft dirty like a typed caption does, so back never drops it.
+  const [pinMoved, setPinMoved] = useState(false);
   const [posting, setPosting] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Full-screen viewer — tapping the scan preview opens it here.
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
-  // The caption is the only editable field on this screen, so it's the
-  // only thing that can make this draft dirty.
-  const dirty = caption.trim().length > 0;
+  // The caption and the pin are the only editable things on this screen,
+  // so they're all that can make this draft dirty.
+  const dirty = caption.trim().length > 0 || pinMoved;
 
   // Monotonic id for "the location the label belongs to". Every geocode
   // bumps it, and a result is only applied if it is still the newest one —
@@ -159,6 +164,19 @@ export default function CreatePostScreen() {
     }
   }
 
+  /**
+   * Single tap on the map (inline or full screen) drops or moves the pin —
+   * including the very first one when the photo arrived without a
+   * location. The label is re-resolved for it, with locationSeq dropping
+   * any stale response, and the draft becomes dirty so back can't drop
+   * the move silently.
+   */
+  function handlePinChange(coords: Coordinates) {
+    setPin(coords);
+    setPinMoved(true);
+    resolveLocationName(coords);
+  }
+
   // Leaving is only allowed straight away when nothing is pending —
   // otherwise the confirmation popup gets the final say.
   function handleBack() {
@@ -202,8 +220,9 @@ export default function CreatePostScreen() {
         caption: caption.trim() || null,
         image_url: scan.image_url,
         image_public_id: scan.image_public_id,
-        // The photo's own spot, fixed at capture/pick time. Null only when
-        // the photo carried no location at all (camera with GPS off).
+        // The photo's own spot at first (capture/pick time), or whatever
+        // the user taps on the map when it had none. Null only when the
+        // photo carried no location at all and no pin was placed.
         latitude: pin ? pin.latitude : null,
         longitude: pin ? pin.longitude : null,
         location_name: pin ? locationName : null,
@@ -285,39 +304,46 @@ export default function CreatePostScreen() {
             }}
           />
 
-          {/* Location — the photo's own spot, read-only */}
+          {/* Location — starts at the photo's own spot; a tap anywhere on
+              the map drops or moves the pin (or places the first one when
+              the photo had no location). */}
           <Text className="font-semibold mt-4 mb-2" style={{ color: "#1B4332" }}>
             Where did you find it?
           </Text>
+          <Text className="text-xs mb-2" style={{ color: "#6b7280" }}>
+            {pin
+              ? "Tap the map to move the pin — double-tap to view it full screen"
+              : "Tap the map to place the pin — double-tap to view it full screen"}
+          </Text>
+
+          <PinMap
+            coord={pin}
+            onPinChange={handlePinChange}
+            zoom={pin ? 14 : 4}
+            height={220}
+            borderRadius={16}
+          />
 
           {pin ? (
-            <>
-              <Text className="text-xs mb-2" style={{ color: "#6b7280" }}>
-                Double-tap to view the map full screen
-              </Text>
-
-              <PinMap coord={pin} zoom={14} height={220} borderRadius={16} />
-
-              {locationName ? (
-                <View className="flex-row items-center mt-2">
-                  <Image
-                    source={require("@/assets/images/icons/pin.png")}
-                    style={{ width: 13, height: 13 }}
-                    resizeMode="contain"
-                  />
-                  <Text className="text-xs ml-1" style={{ color: "#374151" }}>
-                    {locationName}
-                  </Text>
-                </View>
-              ) : geocoding ? (
-                <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-                  Naming this spot...
+            locationName ? (
+              <View className="flex-row items-center mt-2">
+                <Image
+                  source={require("@/assets/images/icons/pin.png")}
+                  style={{ width: 13, height: 13 }}
+                  resizeMode="contain"
+                />
+                <Text className="text-xs ml-1" style={{ color: "#374151" }}>
+                  {locationName}
                 </Text>
-              ) : null}
-            </>
+              </View>
+            ) : geocoding ? (
+              <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                Naming this spot...
+              </Text>
+            ) : null
           ) : (
-            <Text className="text-xs" style={{ color: "#6b7280" }}>
-              This photo doesn't have a location, so the post will be shared without one.
+            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+              This photo doesn't have a location — tap the map to add one.
             </Text>
           )}
 

@@ -123,6 +123,9 @@ export default function VerifyPinScreen() {
       } = await supabase.auth.getSession();
       if (session) await markPinVerified(session.user.id);
 
+      // Sign-in is complete — clear the whole auth history so back from
+      // Home exits the app instead of returning to the sign-in flow.
+      router.dismissAll();
       router.replace("/tab/home");
     } catch (err) {
       console.error("[verifypin] verify failed:", err);

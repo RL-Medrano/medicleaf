@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  AppState,
+  Linking,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -16,8 +18,14 @@ import { supabase } from "@/utils/supabase";
 import { uploadToCloudinary } from "@/utils/cloudinary";
 import { checkIsOnline } from "@/utils/network";
 import { getAuthState } from "@/utils/guest";
+import { getStagedGuestScan, stageGuestScan } from "@/utils/guestScan";
 import * as Location from "expo-location";
-import { getPlantDetailsBySlug, getDisplayName, PlantDetails } from "@/utils/plantClassifier";
+import {
+  getPlantDetailsBySlug,
+  getDisplayName,
+  PlantDetails,
+  type SimilarPlant,
+} from "@/utils/plantClassifier";
 import { invalidateScanHistory } from "@/utils/scanHistory";
 import {
   type PhotoCoords,
@@ -34,9 +42,14 @@ export default function ScanResultScreen() {
     accuracy?: string;
     date?: string;
     time?: string;
+    // "1" for a failed detection — no slug; renders the failed layout
+    // (Unknown + Failed Scan badge) instead of the identified plant.
+    failed?: string;
+    // Runner-up candidates as a JSON array, for the Similar Plant button
+    // on a fresh failed scan (History reopens carry none).
+    similar?: string;
     // Where the photo came from and its capture-time location:
     imageSource?: string; // "camera" | "library"
-    locationDenied?: string; // "1" when the user refused location permission
     photoLat?: string;
     photoLng?: string;
     // Reopened saved scan, from History:
@@ -62,6 +75,15 @@ export default function ScanResultScreen() {
   // need different handling.
   const [notFound, setNotFound] = useState(false);
 
+  // Failed-scan mode — set for a fresh "Failed to Detect" redirect
+  // (params.failed === "1") or a saved "Unknown" reopened from History
+  // (plant_slug null). Renders the failed-result layout instead of the
+  // identified-plant one.
+  const [failedMode, setFailedMode] = useState(false);
+  // Runner-up candidates from the model (fresh failed scans only — they
+  // travel as a JSON param). Feeds the Similar Plant button.
+  const [similar, setSimilar] = useState<SimilarPlant[]>([]);
+
   // Display fields — populated either directly from params (fresh scan)
   // or from the fetched scans row (reopened from History).
   const [displayImageUri, setDisplayImageUri] = useState<string | null>(null);
@@ -71,14 +93,17 @@ export default function ScanResultScreen() {
   // The photo's own location — the capture-time GPS fix for a camera shot,
   // the EXIF GPS for a gallery upload. Null when the photo has none.
   const [photoCoords, setPhotoCoords] = useState<PhotoCoords | null>(null);
-  // Set when a gallery upload carries no location: posting is blocked and
-  // only Save / Go to Library are offered (see handlePost).
-  const [blockedFromPosting, setBlockedFromPosting] = useState(false);
-  // True when a camera photo carries no location purely because the user
-  // refused location permission — Post asks them once more before refusing.
-  const [locationDenied, setLocationDenied] = useState(false);
-  // True while that second permission prompt / GPS fix is in flight.
+  // The one-time location offer for a fresh camera photo that arrived
+  // without a location — loadData flags it, the effect below shows the
+  // popup. Refusing it never blocks anything (Save / Post / Go to Library
+  // all keep working); the spot can also be placed by hand in Create Post.
+  const [promptLocation, setPromptLocation] = useState(false);
+  // True while a permission request / GPS fix is in flight (the popup's
+  // Turn on location flow, and the Post button's label).
   const [locating, setLocating] = useState(false);
+  // Set when the user leaves for Settings from the popup flow — the
+  // AppState listener below retries the fix the moment they come back.
+  const awaitingSettings = useRef(false);
   // Full-screen viewer — tapping the hero photo opens it here.
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -87,9 +112,44 @@ export default function ScanResultScreen() {
     loadData();
   }, [params.slug, params.scanId]);
 
+  // The one-time location offer — only for a fresh CAMERA photo with no
+  // location (a gallery upload is exempt: no setting can add a location
+  // to an old photo's EXIF, and History reopens already had their chance).
+  // Nothing here ever blocks: Not now (or dismissing the alert) simply
+  // keeps going without one — Save, Post and Go to Library all still work.
+  useEffect(() => {
+    if (!promptLocation || loading) return;
+    Alert.alert(
+      "Add this photo's location",
+      "Turn on location so this scan carries the spot it was taken at. You can also continue without one — a spot can be placed on the map when you post.",
+      [
+        { text: "Not now", style: "cancel", onPress: () => setPromptLocation(false) },
+        {
+          text: "Turn on location",
+          onPress: () => {
+            setPromptLocation(false);
+            void turnOnLocation();
+          },
+        },
+      ]
+    );
+  }, [promptLocation, loading]);
+
+  // Back from Settings: retry the fix exactly once per trip — success
+  // updates the screen silently, failure says so once (no looping nags).
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next !== "active" || !awaitingSettings.current) return;
+      awaitingSettings.current = false;
+      void retryLocationAfterSettings();
+    });
+    return () => subscription.remove();
+  }, []);
+
   async function loadData() {
     setLoading(true);
     setNotFound(false);
+    setFailedMode(false);
 
     // getAuthState() also recognises a local guest (no session at all),
     // which getUser() would have treated as a signed-in member.
@@ -132,8 +192,6 @@ export default function ScanResultScreen() {
           scan.longitude == null ? null : String(scan.longitude)
         )
       );
-      setBlockedFromPosting(false);
-      setLocationDenied(false);
 
       // NOTE: this can come back null if plant_slug no longer has a
       // matching entry in plant_info.json — e.g. a class was renamed or
@@ -143,7 +201,13 @@ export default function ScanResultScreen() {
       // silently leaving the screen stuck on the loading spinner.
       const details = getPlantDetailsBySlug(scan.plant_slug);
       setPlant(details);
-      if (!details) setNotFound(true);
+      if (!details) {
+        // plant_slug null = a failed scan saved as "Unknown" → the failed
+        // result screen; a slug that no longer resolves in plant_info.json
+        // (renamed/removed class) → the notFound fallback below.
+        if (scan.plant_slug == null) setFailedMode(true);
+        else setNotFound(true);
+      }
 
       // Check whether this scan already has a post, so we know whether
       // to show the Post button or just Delete.
@@ -154,6 +218,31 @@ export default function ScanResultScreen() {
         .maybeSingle();
       setHasBeenPosted(!!existingPost);
 
+      setLoading(false);
+      return;
+    }
+
+    // Fresh FAILED scan — flagged by the Scanning screen instead of a
+    // slug. Everything comes from params; the model's runner-ups feed
+    // the Similar Plant button. No plant details exist.
+    if (params.failed === "1") {
+      const coords = coordsFromParams(params.photoLat, params.photoLng);
+      setFailedMode(true);
+      setDisplayImageUri(params.imageUri ?? null);
+      setDisplayAccuracy(null);
+      setDisplayDate(params.date ?? null);
+      setDisplayTime(params.time ?? null);
+      setPlantSlug(null);
+      setDisplayName("Unknown");
+      setPhotoCoords(coords);
+      // Fresh camera photo with no location — flag the one-time offer
+      // (gallery uploads and History reopens never see it).
+      if (params.imageSource === "camera" && !coords) setPromptLocation(true);
+      try {
+        setSimilar(params.similar ? JSON.parse(params.similar) : []);
+      } catch {
+        setSimilar([]); // malformed payload — just hide the button
+      }
       setLoading(false);
       return;
     }
@@ -173,19 +262,111 @@ export default function ScanResultScreen() {
 
     const coords = coordsFromParams(params.photoLat, params.photoLng);
     setPhotoCoords(coords);
-    // A gallery upload without EXIF GPS can't be posted: its location can't
-    // be recovered, and guessing (e.g. the device's position right now)
-    // would pin the wrong place entirely. Posting is blocked instead —
-    // Save and Go to Library keep working.
-    setBlockedFromPosting(params.imageSource === "library" && coords == null);
-    // Only a fresh scan can know WHY there's no location. A camera photo
-    // with denied permission gets one more chance at Post time.
-    setLocationDenied(params.locationDenied === "1");
+    // A gallery upload without EXIF GPS travels without a location — the
+    // device's position is never guessed for an old photo, and it gets no
+    // popup either (no setting can add a location to an old photo). A
+    // fresh CAMERA photo with no location does get the one-time offer.
+    if (params.imageSource === "camera" && !coords) setPromptLocation(true);
 
     const details = getPlantDetailsBySlug(params.slug);
     setPlant(details);
     if (!details) setNotFound(true);
     setLoading(false);
+  }
+
+  /**
+   * The popup's "Turn on location" path. Normal permission dialog first;
+   * if it lands, take the fix right away. Two honest fallbacks: a
+   * permanently blocked permission → this app's page in Settings; fine
+   * permission but the device's location toggle off → the device's
+   * location settings. Either way the user comes back to THIS screen and
+   * the AppState listener above picks the spot up automatically.
+   * Refusing any of it never blocks anything — Save, Post and Create
+   * Post's map all keep working.
+   */
+  async function turnOnLocation() {
+    setLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (!permission.granted) {
+        // The system dialog won't ever appear again — Settings is the only way.
+        if (!permission.canAskAgain) {
+          Alert.alert(
+            "Allow location in Settings",
+            "Open Settings and switch Location on for MedicLeaf — this screen will pick the spot up automatically when you come back.",
+            [
+              { text: "Not now", style: "cancel" },
+              {
+                text: "Open Settings",
+                onPress: () => {
+                  awaitingSettings.current = true;
+                  void Linking.openSettings().catch(() => {
+                    awaitingSettings.current = false;
+                  });
+                },
+              },
+            ]
+          );
+        }
+        return; // asked and refused — keep going without a location
+      }
+
+      const coords = await getCaptureLocation();
+      if (coords) {
+        setPhotoCoords(coords);
+        return;
+      }
+
+      const servicesOn = await Location.hasServicesEnabledAsync().catch(() => true);
+      Alert.alert(
+        servicesOn ? "Couldn't get your location" : "Device location is off",
+        servicesOn
+          ? "No location fix came back yet — you can still save or post without one, or place a spot on the map in Create Post."
+          : "Your device's location is switched off. Turn it on in Settings — this screen will pick the spot up automatically when you come back.",
+        [
+          { text: "OK", style: "cancel" },
+          ...(servicesOn
+            ? []
+            : [
+                {
+                  text: "Open location settings",
+                  onPress: () => {
+                    awaitingSettings.current = true;
+                    Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS").catch(
+                      () => {
+                        awaitingSettings.current = false;
+                      }
+                    );
+                  },
+                },
+              ]),
+        ]
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  /** One silent retry after a trip to Settings; one honest alert if it still failed. */
+  async function retryLocationAfterSettings() {
+    setLocating(true);
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.granted) {
+        const coords = await getCaptureLocation();
+        if (coords) {
+          setPhotoCoords(coords);
+          return;
+        }
+      }
+      Alert.alert(
+        "Location still isn't available",
+        "No location could be picked up — you can keep going and save or post without one, or place a spot on the map in Create Post."
+      );
+    } finally {
+      setLocating(false);
+    }
   }
 
   function promptSignUp() {
@@ -200,6 +381,71 @@ export default function ScanResultScreen() {
   }
 
   /**
+   * Guest Save — Option 1 + Variant A.
+   *
+   * The FIRST guest Save is stored on this device (photo copy + payload,
+   * fully offline) and uploads by itself the moment any account signs in
+   * on this phone — a new sign-up or an existing account logging in.
+   * Every later guest Save is refused with the account prompt instead of
+   * being kept: one staged scan per device. The scan currently in hand is
+   * NOT stored when refused — they'd scan it again after signing up.
+   */
+  async function handleGuestSave() {
+    if (saving) return;
+
+    // A failed scan has no plant_slug to stage against — the account
+    // prompt is the honest answer for guests (same as guest Post).
+    if (failedMode) {
+      promptSignUp();
+      return;
+    }
+
+    try {
+      const staged = await getStagedGuestScan();
+      if (staged) {
+        Alert.alert(
+          "Save limit reached",
+          "You can save one scan as a guest. Create an account or log in to save more scans.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Sign up / Log in", onPress: () => router.push("/welcome") },
+          ]
+        );
+        return;
+      }
+
+      if (!plantSlug || !displayImageUri) return;
+
+      setSaving(true);
+      await stageGuestScan({
+        plant_slug: plantSlug,
+        name: displayName,
+        accuracy: displayAccuracy,
+        date: displayDate,
+        time: displayTime,
+        imageUri: displayImageUri,
+      });
+
+      Alert.alert(
+        "Scan saved on this device",
+        "Your scan is waiting on this phone. Sign up or log in and it will be added to your account's history automatically.",
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Sign up / Log in", onPress: () => router.push("/welcome") },
+        ]
+      );
+    } catch (err) {
+      console.error("[scanresult] guest save failed:", err);
+      Alert.alert(
+        "Something went wrong",
+        "Couldn't save this scan on your device. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
    * Pure save logic — no guest prompting, no "already saved" bail, no
    * navigation. Callers (Save button, Post, Go to Library) each decide
    * when this should run and what to do with the result.
@@ -207,12 +453,16 @@ export default function ScanResultScreen() {
    * Returns the new scan id on success, or null on failure (and shows
    * its own error alert on failure, since every caller needs that).
    *
-   * `coords` defaults to the photo's capture-time location; handlePost
-   * passes a fix it obtained late (permission granted at Post time) so
-   * that spot is the one persisted with the scan.
+   * `coords` defaults to the photo's capture-time location (the popup's
+   * Turn on location flow updates that state in place, so a fix obtained
+   * later still rides along through this default).
    */
   async function performSave(coords: PhotoCoords | null = photoCoords): Promise<string | null> {
-    if (!plant || !plantSlug || !displayImageUri) return null;
+    // A failed scan carries no plant (plant/plantSlug null by design) —
+    // it still saves: photo + the name "Unknown", accuracy stored as 0
+    // and never displayed (the Failed Scan badge takes that slot).
+    if (!displayImageUri) return null;
+    if (!failedMode && (!plant || !plantSlug)) return null;
 
     setSaving(true);
     try {
@@ -280,7 +530,8 @@ export default function ScanResultScreen() {
   // stay put and let them retry.
   async function handleSave() {
     if (isGuest) {
-      promptSignUp();
+      // Staging / one-save limit — see handleGuestSave.
+      await handleGuestSave();
       return;
     }
     if (savedScanId || saving) return;
@@ -301,23 +552,10 @@ export default function ScanResultScreen() {
   }
 
   // Post — always requires being online and logged in. Auto-saves first
-  // if this scan hasn't been saved yet, then navigates.
+  // if this scan hasn't been saved yet, then navigates. A photo with no
+  // location posts anyway: the popup already made its offer, and Create
+  // Post lets the user place the spot by hand before sharing.
   async function handlePost() {
-    // A gallery upload with no location can't be pinned honestly, so it
-    // can't be posted at all — the only things left to do with it are
-    // saving the scan or heading to the library.
-    if (blockedFromPosting) {
-      Alert.alert(
-        "No location on this photo",
-        "The image you're trying to post doesn't contain any location, so it can't be shared. You can still save this scan or go to the library.",
-        [
-          { text: "Save", onPress: handleSave },
-          { text: "Go to Library", onPress: handleGoToLibrary },
-        ]
-      );
-      return;
-    }
-
     if (isGuest) {
       promptSignUp();
       return;
@@ -332,58 +570,21 @@ export default function ScanResultScreen() {
       return;
     }
 
-    // The camera photo carries no location purely because permission was
-    // refused on the Scan screen — so ask once more before posting.
-    // Granted: a fix is taken right now and posted with (and stored on
-    // the scan). Still denied: posting stays blocked until location
-    // access is allowed.
-    let postCoords = photoCoords;
-    if (locationDenied && !postCoords) {
-      setLocating(true);
-      try {
-        const permission = await Location.requestForegroundPermissionsAsync();
-
-        if (!permission.granted) {
-          Alert.alert(
-            "Location permission needed",
-            "Allow location access to post this scan result — without it there's no way to show where this plant was found. You can still save it or go to the library.",
-            [
-              { text: "Save", onPress: handleSave },
-              { text: "Go to Library", onPress: handleGoToLibrary },
-            ]
-          );
-          return;
-        }
-
-        const coords = await getCaptureLocation();
-        if (!coords) {
-          Alert.alert(
-            "Couldn't get your location",
-            "Location permission is on, but no location was found yet. Turn on GPS and try again, or save this scan instead."
-          );
-          return;
-        }
-
-        postCoords = coords;
-        setPhotoCoords(coords); // keep the screen consistent if we stay
-      } finally {
-        setLocating(false);
-      }
-    }
-
     let scanId = savedScanId;
     if (!scanId) {
-      scanId = await performSave(postCoords);
+      scanId = await performSave();
       if (!scanId) return; // save failed — performSave already alerted
     }
 
-    if (!plant) return;
+    // Failed mode has no plant — it posts off the saved scan row alone.
+    if (!plant && !failedMode) return;
 
-    // The photo's own location travels with it, so Create Post pins the
-    // original spot instead of asking the device where it is right now.
+    // The photo's own location travels with it, so Create Post opens on
+    // the original spot (or an empty map to place one) instead of asking
+    // the device where it is right now.
     router.push({
       pathname: "/createpost",
-      params: { scanId, ...coordsToParams(postCoords) },
+      params: { scanId, ...coordsToParams(photoCoords) },
     });
   }
 
@@ -409,6 +610,17 @@ export default function ScanResultScreen() {
     }
 
     router.push({ pathname: "/plantdetail", params: { slug: plantSlug } });
+  }
+
+  // Failed scan only — pushes the model's runner-ups to the Similar
+  // Medicinal Plant screen. The button rendering it (failed layout) hides
+  // itself when there are none, e.g. a scan reopened from History, which
+  // carries no candidates.
+  function handleViewSimilar() {
+    router.push({
+      pathname: "/similarplants",
+      params: { similar: JSON.stringify(similar) },
+    });
   }
 
   function handleDelete() {
@@ -464,6 +676,210 @@ export default function ScanResultScreen() {
     return (
       <SafeAreaView className="flex-1 items-center justify-center" style={{ backgroundColor: "#D8F3DC" }}>
         <ActivityIndicator color="#1B4332" />
+      </SafeAreaView>
+    );
+  }
+
+  // Failed scan — a fresh "Failed to Detect" redirect, or a saved
+  // "Unknown" reopened from History (plant_slug null). Mirrors the
+  // identified layout but has no plant details: Unknown + the Failed Scan
+  // badge where the accuracy pill sits, tab bodies reading "Unknown",
+  // and Similar Plant / Save / Post instead of Go to Library. The saved
+  // branch follows the identified screen's rules (Post hidden once this
+  // scan is already posted, then Delete) — a History reopen never has
+  // candidates, so Similar Plant stays absent there by itself.
+  if (failedMode) {
+    const failedTabs = [
+      { key: "about", label: "About" },
+      { key: "benefits", label: "Benefits" },
+      { key: "preparation", label: "Preparation" },
+    ] as const;
+    const activeLabel =
+      failedTabs.find((tab) => tab.key === activeTab)?.label ?? "About";
+
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#D8F3DC" />
+        <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+          {/* Header — identical to the identified result */}
+          <View className="flex-row items-center mt-4">
+            <Pressable onPress={() => router.back()} hitSlop={12}>
+              <Image
+                source={require("@/assets/images/icons/arrow_left.png")}
+                style={{ width: 26, height: 26, tintColor: "#1A1A1A" }}
+                resizeMode="contain"
+              />
+            </Pressable>
+            <Text
+              className="flex-1 text-center font-bold"
+              style={{ color: "#1A1A1A", fontSize: 22, marginRight: 28 }}
+              numberOfLines={1}
+            >
+              Scan Result
+            </Text>
+          </View>
+
+          {/* Hero photo */}
+          <Image
+            source={{ uri: displayImageUri ?? undefined }}
+            style={{ width: "100%", height: 360, borderRadius: 24, marginTop: 16 }}
+            resizeMode="cover"
+          />
+
+          {/* Name row — the Failed Scan badge sits where the accuracy
+              pill does on an identified result. */}
+          <View className="mt-4 flex-row items-center">
+            <View className="flex-1 mr-3">
+              <Text className="font-bold" style={{ color: "#1A1A1A", fontSize: 28 }}>
+                {displayName || "Unknown"}
+              </Text>
+            </View>
+            <View
+              className="rounded-full"
+              style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 10 }}
+            >
+              <Text style={{ color: "#DC2626", fontSize: 14, fontWeight: "600" }}>
+                Failed Scan
+              </Text>
+            </View>
+          </View>
+
+          {/* Tabs — same styles as the identified result */}
+          <View
+            className="flex-row items-center mt-4 p-1.5"
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 16 }}
+          >
+            {failedTabs.map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  className="flex-1 items-center py-3"
+                  style={{
+                    backgroundColor: selected ? "#2F5233" : "transparent",
+                    borderRadius: 12,
+                  }}
+                >
+                  <Text
+                    className={selected ? "font-bold" : "font-semibold"}
+                    style={{ color: selected ? "#FFFFFF" : "#6b7280", fontSize: 15 }}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Tab content — there is no plant to describe */}
+          <View
+            className="mt-4 p-5"
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 20, minHeight: 220 }}
+          >
+            <Text className="font-bold mb-2" style={{ color: "#1A1A1A", fontSize: 17 }}>
+              {activeLabel}
+            </Text>
+            <Text style={{ color: "#4b5563", fontSize: 15 }}>Unknown</Text>
+          </View>
+
+          {/* Actions — no Go to Library without a plant. Similar Plant
+              leads to the model's runner-ups, hidden when it had none. */}
+          {!savedScanId ? (
+            <>
+              {similar.length > 0 && (
+                <Pressable
+                  onPress={handleViewSimilar}
+                  disabled={saving}
+                  className="items-center mt-4 py-4"
+                  style={{
+                    backgroundColor: "#5F7E6E",
+                    borderRadius: 10,
+                    opacity: saving ? 0.6 : 1,
+                  }}
+                >
+                  <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                    Similar Plant
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* Save */}
+              <Pressable
+                onPress={handleSave}
+                disabled={saving}
+                className={`items-center ${similar.length > 0 ? "mt-3" : "mt-4"} py-4`}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderWidth: 1.5,
+                  borderColor: "#1E7A34",
+                  borderRadius: 10,
+                  opacity: saving ? 0.6 : 1,
+                }}
+              >
+                <Text className="font-medium" style={{ color: "#1E7A34", fontSize: 16 }}>
+                  {saving ? "Saving..." : "Save"}
+                </Text>
+              </Pressable>
+
+              {/* Post — saves the scan first, then opens Create Post */}
+              <Pressable
+                onPress={handlePost}
+                disabled={saving || locating}
+                className="items-center mt-3 py-4"
+                style={{
+                  backgroundColor: "#1E7A34",
+                  borderRadius: 10,
+                  opacity: saving || locating ? 0.6 : 1,
+                }}
+              >
+                <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                  {saving ? "Saving..." : locating ? "Getting location..." : "Post"}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              {/* Post — hidden once this scan already has a post */}
+              {!hasBeenPosted && (
+                <Pressable
+                  onPress={handlePost}
+                  disabled={saving || locating}
+                  className="items-center mt-4 py-4"
+                  style={{
+                    backgroundColor: "#1E7A34",
+                    borderRadius: 10,
+                    opacity: saving || locating ? 0.6 : 1,
+                  }}
+                >
+                  <Text className="font-medium" style={{ color: "#FFFFFF", fontSize: 16 }}>
+                    {saving ? "Saving..." : locating ? "Getting location..." : "Post"}
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* Delete */}
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                className={`items-center ${hasBeenPosted ? "mt-4" : "mt-3"} py-4`}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderWidth: 1.5,
+                  borderColor: "#DC2626",
+                  borderRadius: 10,
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                <Text className="font-medium" style={{ color: "#DC2626", fontSize: 16 }}>
+                  {deleting ? "Deleting..." : "Delete"}
+                </Text>
+              </Pressable>
+            </>
+          )}
+
+          <View style={{ height: 24 }} />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -711,6 +1127,36 @@ export default function ScanResultScreen() {
             </>
           )}
         </View>
+
+        {/* Physical Characteristics card — shown only on the About tab.
+            Chips read `traits` from plant_info.json (added alongside
+            `about`), same wording as the Similar Medicinal Plant screen.
+            Hidden entirely if a plant has no traits. */}
+        {activeTab === "about" && plant.traits && plant.traits.length > 0 && (
+          <View
+            className="mt-4 p-5"
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 20 }}
+          >
+            <Text className="font-bold mb-3" style={{ color: "#1A1A1A", fontSize: 17 }}>
+              Physical Characteristics
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {plant.traits.map((trait) => (
+                <View
+                  key={trait}
+                  className="rounded-full px-3 py-1"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#D1D5DB",
+                    backgroundColor: "#FFFFFF",
+                  }}
+                >
+                  <Text style={{ color: "#374151", fontSize: 13 }}>{trait}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {!savedScanId ? (
           <>

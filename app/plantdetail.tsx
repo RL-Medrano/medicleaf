@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { getPlantById } from "@/data/plants";
+import { getPlantById, getPlantByAlternativeName } from "@/data/plants";
 import { CachedPlantImageGallery } from "@/components/CachedPlantImage";
 
 const TABS = ["About", "Benefits", "How to use"] as const;
@@ -298,11 +298,45 @@ export default function PlantDetailScreen() {
               <Text className="font-bold mb-2" style={{ color: "#1B4332", fontSize: 17 }}>
                 Alternative:
               </Text>
-              {plant.alternatives.map((alt, i) => (
-                <Text key={i} className="text-sm leading-5" style={{ color: "#374151" }}>
-                  • {alt}
-                </Text>
-              ))}
+              {plant.alternatives.map((alt, i) => {
+                const target = getPlantByAlternativeName(alt);
+                // Link only when the label resolves to a real plant other than
+                // this screen — anything else stays plain text (no dead links).
+                const linked = target && target.id !== plant.id ? target : null;
+                return (
+                  <Text
+                    key={i}
+                    className="text-sm leading-5"
+                    style={{ color: "#374151" }}
+                    onPress={
+                      linked
+                        ? () =>
+                            router.push({
+                              pathname: "/plantdetail",
+                              params: { slug: linked.id },
+                            })
+                        : undefined
+                    }
+                    accessibilityRole={linked ? "link" : undefined}
+                    accessibilityLabel={linked ? `Go to plant ${linked.name}` : undefined}
+                  >
+                    •{" "}
+                    <Text
+                      style={
+                        linked
+                          ? {
+                              color: "#2D6A4F",
+                              fontWeight: "700",
+                              textDecorationLine: "underline",
+                            }
+                          : undefined
+                      }
+                    >
+                      {alt}
+                    </Text>
+                  </Text>
+                );
+              })}
             </View>
 
             <Text className="text-xs text-center mt-4 px-2" style={{ color: "#6b7280" }}>

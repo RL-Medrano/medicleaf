@@ -20,6 +20,11 @@ export type PreparationMethod = {
 export type Plant = {
   id: string;
   name: string;
+  /** Short physical characteristics — rendered as chips on the Similar
+   *  Medicinal Plant screen. Keep to 1–3 words each, physical only
+   *  (leaf, flower, stem, fruit, growth habit), max 6. An empty array
+   *  simply hides the chips row on that plant's card. */
+  traits: string[];
   scientific_name: string;
   family: string;
   imageUrl: ImageSourcePropType; // primary photo — used in list/thumbnail views (bundled via require)
@@ -37,6 +42,7 @@ export const PLANTS: Plant[] = [
   {
     id: "akapulko",
     name: "Akapulko",
+    traits: ["Yellow candle flowers", "Paired round leaflets", "Tall erect shrub", "Long flat pods"],
     scientific_name: "Senna alata",
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/akapulko.jpg"),
@@ -78,6 +84,7 @@ export const PLANTS: Plant[] = [
   {
     id: "alagao",
     name: "Alagao",
+    traits: ["Sharp-scented leaves", "Broad oval leaves", "Small tree", "Tiny white flowers"],
     scientific_name: "Premna odorata",
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/alagao.jpg"),
@@ -119,6 +126,7 @@ export const PLANTS: Plant[] = [
   {
     id: "aloe-vera",
     name: "Aloe Vera",
+    traits: ["Thick fleshy leaves", "Spiky leaf edges", "Gray-green rosette", "White leaf spots"],
     scientific_name: "Aloe vera",
     family: "Asphodelaceae (Aloe family)",
     imageUrl: require("@/assets/images/plants/aloe-vera.jpg"),
@@ -160,6 +168,7 @@ export const PLANTS: Plant[] = [
   {
     id: "ampalaya",
     name: "Ampalaya",
+    traits: ["Climbing vine", "Lobed leaves", "Yellow flowers", "Warty fruit"],
     scientific_name: "Momordica charantia",
     family: "Cucurbitaceae (Gourd family)",
     imageUrl: require("@/assets/images/plants/ampalaya.jpg"),
@@ -201,6 +210,7 @@ export const PLANTS: Plant[] = [
   {
     id: "Aratiles",
     name: "Aratiles",
+    traits: ["Serrated leaves", "Tiny red fruit", "Hairy stems", "Slender tree"],
     scientific_name: "Muntingia calabura",
     family: "Muntingiaceae",
     imageUrl: require("@/assets/images/plants/aratiles.jpg"),
@@ -242,6 +252,7 @@ export const PLANTS: Plant[] = [
   {
     id: "atis",
     name: "Atis",
+    traits: ["Knobby green fruit", "Glossy oval leaves", "Short bushy tree", "Creamy flowers"],
     scientific_name: "Annona squamosa",
     family: "Annonaceae (Custard-apple family)",
     imageUrl: require("@/assets/images/plants/atis.jpg"),
@@ -283,6 +294,7 @@ export const PLANTS: Plant[] = [
   {
     id: "banaba",
     name: "Banaba",
+    traits: ["Purple flower spikes", "Large oval leaves", "Broad crown", "Big capsule fruit"],
     scientific_name: "Lagerstroemia speciosa",
     family: "Lythraceae (Loosestrife family)",
     imageUrl: require("@/assets/images/plants/banaba.jpg"),
@@ -324,6 +336,7 @@ export const PLANTS: Plant[] = [
   {
     id: "basil",
     name: "Basil",
+    traits: ["Aromatic leaves", "Square stems", "Small white flowers", "Opposite leaf pairs"],
     scientific_name: "Ocimum basilicum",
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/basil.jpg"),
@@ -365,6 +378,7 @@ export const PLANTS: Plant[] = [
   {
     id: "bayabas",
     name: "Bayabas (Guava)",
+    traits: ["Rough red bark", "Peeling pale bark", "White fluffy flowers", "Round green fruit"],
     scientific_name: "Psidium guajava",
     family: "Myrtaceae (Myrtle family)",
     imageUrl: require("@/assets/images/plants/bayabas.jpg"),
@@ -406,6 +420,7 @@ export const PLANTS: Plant[] = [
   {
     id: "bignay",
     name: "Bignay",
+    traits: ["Clustering berries", "Red to black fruit", "Glossy pointed leaves", "Small shade tree"],
     scientific_name: "Antidesma bunius",
     family: "Phyllanthaceae",
     imageUrl: require("@/assets/images/plants/bignay.jpg"),
@@ -447,6 +462,7 @@ export const PLANTS: Plant[] = [
   {
     id: "calamansi",
     name: "Calamansi",
+    traits: ["Tiny round fruit", "Glossy leaves", "Thorny branches", "Bushy small tree"],
     scientific_name: "Citrus × microcarpa",
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/calamansi.jpg"),
@@ -488,6 +504,7 @@ export const PLANTS: Plant[] = [
   {
     id: "cassava",
     name: "Cassava",
+    traits: ["Palmate leaves", "Woody stalks", "Brown tuber roots", "Tall stems"],
     scientific_name: "Manihot esculenta",
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/cassava.jpg"),
@@ -529,6 +546,7 @@ export const PLANTS: Plant[] = [
   {
     id: "dayap",
     name: "Dayap",
+    traits: ["Small round lime", "Thorny branches", "Glossy leaves", "Twisting shrub"],
     scientific_name: "Citrus × aurantiifolia",
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/dayap.jpg"),
@@ -570,6 +588,7 @@ export const PLANTS: Plant[] = [
   {
     id: "gumamela",
     name: "Gumamela",
+    traits: ["Trumpet flowers", "Glossy toothed leaves", "Round bushy shrub"],
     scientific_name: "Hibiscus rosa-sinensis",
     family: "Malvaceae (Mallow family)",
     imageUrl: require("@/assets/images/plants/gumamela.jpg"),
@@ -611,6 +630,7 @@ export const PLANTS: Plant[] = [
   {
     id: "ipil-ipil",
     name: "Ipil-Ipil",
+    traits: ["Feathery leaves", "Flat seed pods", "Slender tree", "Fine leaflets"],
     scientific_name: "Leucaena leucocephala",
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/ipil-ipil.jpg"),
@@ -647,6 +667,7 @@ export const PLANTS: Plant[] = [
   {
     id: "kamantigi",
     name: "Kamantigi",
+    traits: ["Succulent stems", "Pink clustered flowers", "Toothed oval leaves"],
     scientific_name: "Impatiens balsamina",
     family: "Balsaminaceae (Touch-me-not family)",
     imageUrl: require("@/assets/images/plants/kamantigi.jpg"),
@@ -683,6 +704,7 @@ export const PLANTS: Plant[] = [
   {
     id: "kamias",
     name: "Kamias",
+    traits: ["Finger-like ribbed fruit", "Pinnate leaves", "Small spreading tree", "Red ripe fruit"],
     scientific_name: "Averrhoa bilimbi",
     family: "Oxalidaceae (Wood-sorrel family)",
     imageUrl: require("@/assets/images/plants/kamias.jpg"),
@@ -724,6 +746,7 @@ export const PLANTS: Plant[] = [
   {
     id: "lagundi",
     name: "Lagundi",
+    traits: ["Five-lobed leaves", "White flower spikes", "Rough square stems", "Tall spreading shrub"],
     scientific_name: "Vitex negundo",
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/lagundi.jpg"),
@@ -765,6 +788,7 @@ export const PLANTS: Plant[] = [
   {
     id: "madre-de-cacao",
     name: "Madre de Cacao",
+    traits: ["Pink pea flowers", "Feathery leaves", "Broad flat pods", "Shade tree"],
     scientific_name: "Gliricidia sepium",
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/madre-de-cacao.jpg"),
@@ -801,6 +825,7 @@ export const PLANTS: Plant[] = [
   {
     id: "malunggay",
     name: "Malunggay",
+    traits: ["Feathery compound leaves", "Long ribbed pods", "Slender soft trunk", "Small white flowers"],
     scientific_name: "Moringa oleifera",
     family: "Moringaceae",
     imageUrl: require("@/assets/images/plants/malungay.jpg"),
@@ -842,6 +867,7 @@ export const PLANTS: Plant[] = [
   {
     id: "manga",
     name: "Manga (Mango)",
+    traits: ["Lance-shaped leaves", "Clustered fruit", "Tall shade tree", "Wide canopy"],
     scientific_name: "Mangifera indica",
     family: "Anacardiaceae (Cashew family)",
     imageUrl: require("@/assets/images/plants/manga.jpg"),
@@ -883,6 +909,7 @@ export const PLANTS: Plant[] = [
   {
     id: "Mangosteen",
     name: "Mangosteen",
+    traits: ["Thick glossy leaves", "Purple round fruit", "Yellow sap", "Slow dense tree"],
     scientific_name: "Garcinia mangostana",
     family: "Clusiaceae (Mangosteen family)",
     imageUrl: require("@/assets/images/plants/mangosteen.jpg"),
@@ -919,6 +946,7 @@ export const PLANTS: Plant[] = [
   {
     id: "oregano",
     name: "Oregano",
+    traits: ["Thick fuzzy leaves", "Aromatic scent", "Fleshy oval leaves", "Low spreading herb"],
     scientific_name: "Plectranthus amboinicus",
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/oregano.jpg"),
@@ -960,6 +988,7 @@ export const PLANTS: Plant[] = [
   {
     id: "pandan",
     name: "Pandan",
+    traits: ["Long blade leaves", "Sweet aroma", "Spiral leaf growth", "Slender stalks"],
     scientific_name: "Pandanus amaryllifolius",
     family: "Pandanaceae (Screwpine family)",
     imageUrl: require("@/assets/images/plants/pandan.jpg"),
@@ -1001,6 +1030,7 @@ export const PLANTS: Plant[] = [
   {
     id: "pansit-pansitan",
     name: "Pansit-Pansitan",
+    traits: ["Translucent stems", "Heart-shaped leaves", "Succulent herb", "Tiny green flowers"],
     scientific_name: "Peperomia pellucida",
     family: "Piperaceae (Pepper family)",
     imageUrl: require("@/assets/images/plants/pansit-pansitan.jpg"),
@@ -1042,6 +1072,7 @@ export const PLANTS: Plant[] = [
   {
     id: "peanut",
     name: "Peanut",
+    traits: ["Paired leaflets", "Yellow pea flowers", "Underground pods", "Low spreading herb"],
     scientific_name: "Arachis hypogaea",
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/peanut.jpg"),
@@ -1083,6 +1114,7 @@ export const PLANTS: Plant[] = [
   {
     id: "pomelo",
     name: "Pomelo",
+    traits: ["Large round fruit", "Thick glossy leaves", "Thorny branches", "Tall citrus tree"],
     scientific_name: "Citrus maxima",
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/pomelo.jpg"),
@@ -1124,6 +1156,7 @@ export const PLANTS: Plant[] = [
   {
     id: "saluyot",
     name: "Saluyot",
+    traits: ["Serrated leaves", "Tall slender stems", "Small yellow flowers"],
     scientific_name: "Corchorus olitorius",
     family: "Malvaceae (Mallow family)",
     imageUrl: require("@/assets/images/plants/saluyot.jpg"),
@@ -1160,6 +1193,7 @@ export const PLANTS: Plant[] = [
   {
     id: "sambong",
     name: "Sambong",
+    traits: ["Fuzzy soft leaves", "Silver-green color", "Camphor scent", "Upright shrub"],
     scientific_name: "Blumea balsamifera",
     family: "Asteraceae (Daisy family)",
     imageUrl: require("@/assets/images/plants/sambong.jpg"),
@@ -1201,6 +1235,7 @@ export const PLANTS: Plant[] = [
   {
     id: "sampaloc",
     name: "Sampaloc",
+    traits: ["Feathery leaves", "Brown pod fruit", "Tall spreading tree"],
     scientific_name: "Tamarindus indica",
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/sampaloc.jpg"),
@@ -1242,6 +1277,7 @@ export const PLANTS: Plant[] = [
   {
     id: "sampasampalukan",
     name: "Sampasampalukan",
+    traits: ["Chain-like fruit", "Tiny fan leaves", "Slender branches", "Low herb"],
     scientific_name: "Phyllanthus niruri",
     family: "Phyllanthaceae",
     imageUrl: require("@/assets/images/plants/sampasampalukan.jpg"),
@@ -1278,6 +1314,7 @@ export const PLANTS: Plant[] = [
   {
     id: "siling-labuyo",
     name: "Siling Labuyo",
+    traits: ["Tiny red chilies", "Small pointed leaves", "Low bushy plant"],
     scientific_name: "Capsicum frutescens",
     family: "Solanaceae (Nightshade family)",
     imageUrl: require("@/assets/images/plants/siling-labuyo.jpg"),
@@ -1319,6 +1356,7 @@ export const PLANTS: Plant[] = [
   {
     id: "sweet-potato",
     name: "Sweet Potato",
+    traits: ["Heart-shaped leaves", "Trailing vines", "Purple tuber roots"],
     scientific_name: "Ipomoea batatas",
     family: "Convolvulaceae (Morning glory family)",
     imageUrl: require("@/assets/images/plants/sweet-potato.jpg"),
@@ -1360,6 +1398,7 @@ export const PLANTS: Plant[] = [
   {
     id: "takip-kohol",
     name: "Takip-Kohol",
+    traits: ["Round scalloped leaves", "Creeping stems", "Tiny fan flowers"],
     scientific_name: "Centella asiatica",
     family: "Apiaceae (Carrot family)",
     imageUrl: require("@/assets/images/plants/takip-kohol.jpg"),
@@ -1401,6 +1440,7 @@ export const PLANTS: Plant[] = [
   {
     id: "tawa-tawa",
     name: "Tawa-Tawa",
+    traits: ["Hairy stems", "Tiny flower clusters", "Narrow leaves", "Low weed"],
     scientific_name: "Euphorbia hirta",
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/tawa-tawa.jpg"),
@@ -1432,6 +1472,7 @@ export const PLANTS: Plant[] = [
   {
     id: "tsaang-gubat",
     name: "Tsaang Gubat",
+    traits: ["Tiny rough leaves", "Thorny twigs", "Dense small shrub", "Small white flowers"],
     scientific_name: "Ehretia microphylla",
     family: "Boraginaceae (Borage family)",
     imageUrl: require("@/assets/images/plants/tsaang-gubat.jpg"),
@@ -1473,6 +1514,7 @@ export const PLANTS: Plant[] = [
   {
     id: "tuba",
     name: "Tuba",
+    traits: ["Lobed leaves", "Yellow flowers", "Bean-like pods", "Milky sap"],
     scientific_name: "Jatropha curcas",
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/tuba.jpg"),
@@ -1502,6 +1544,7 @@ export const PLANTS: Plant[] = [
   {
     id: "turmeric",
     name: "Turmeric",
+    traits: ["Broad blade leaves", "Orange rhizome", "Tall leafy stems"],
     scientific_name: "Curcuma longa",
     family: "Zingiberaceae (Ginger family)",
     imageUrl: require("@/assets/images/plants/turmeric.jpg"),
@@ -1543,6 +1586,7 @@ export const PLANTS: Plant[] = [
   {
     id: "Uray",
     name: "Uray",
+    traits: ["Red-green leaves", "Spiny stems", "Red flower plumes"],
     scientific_name: "Amaranthus spinosus",
     family: "Amaranthaceae (Amaranth family)",
     imageUrl: require("@/assets/images/plants/uray.jpg"),
@@ -1584,6 +1628,7 @@ export const PLANTS: Plant[] = [
   {
     id: "yerba-buena",
     name: "Yerba Buena",
+    traits: ["Small aromatic leaves", "Creeping stems", "Scented mint"],
     scientific_name: "Clinopodium douglasii",
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/yerba-buena.jpg"),
@@ -1640,6 +1685,44 @@ export function getRandomPlants(count: number, excludeIds: string[] = []): Plant
 
 export function getPlantById(id: string) {
   return PLANTS.find((p) => p.id === id);
+}
+
+/**
+ * True when `word` appears in `text` on letter boundaries (case-insensitive),
+ * e.g. "guava" matches "Bayabas (Guava)" but would not match "Guavalier".
+ */
+function containsWord(text: string, word: string): boolean {
+  const haystack = text.toLowerCase();
+  let from = haystack.indexOf(word);
+  while (from !== -1) {
+    const before = from === 0 ? "" : haystack[from - 1];
+    const afterIdx = from + word.length;
+    const after = afterIdx >= haystack.length ? "" : haystack[afterIdx];
+    const isLetter = (c: string) => c !== "" && /[a-z]/i.test(c);
+    if (!isLetter(before) && !isLetter(after)) return true;
+    from = haystack.indexOf(word, from + 1);
+  }
+  return false;
+}
+
+/**
+ * Resolve an "Alternative:" label (e.g. "Guava", "Madre de Cacao") to the
+ * plant it names, so the detail screen can render it as a tappable link.
+ * 1) exact common-name match — covers 75 of today's 80 labels;
+ * 2) whole-word containment fallback so aliases like "Guava" or "Bayabas"
+ *    still land on "Bayabas (Guava)".
+ * Returns undefined when nothing — or more than one plant — matches, so the
+ * caller can leave the label as plain text instead of linking somewhere wrong.
+ */
+export function getPlantByAlternativeName(label: string): Plant | undefined {
+  const needle = label.trim().toLowerCase();
+  if (!needle) return undefined;
+
+  const exact = PLANTS.find((p) => p.name.trim().toLowerCase() === needle);
+  if (exact) return exact;
+
+  const hits = PLANTS.filter((p) => containsWord(p.name, needle));
+  return hits.length === 1 ? hits[0] : undefined;
 }
 
 /**

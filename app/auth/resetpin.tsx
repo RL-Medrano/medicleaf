@@ -89,6 +89,9 @@ export default function ResetPinScreen() {
       } = await supabase.auth.getSession();
       if (session) await markPinVerified(session.user.id);
 
+      // The PIN is reset — clear the forgot-PIN history so back from Home
+      // exits the app instead of returning to these screens.
+      router.dismissAll();
       router.replace("/tab/home");
     } catch (err) {
       console.error("[resetpin] save failed:", err);

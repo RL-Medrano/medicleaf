@@ -39,10 +39,24 @@ const MODEL_INPUT_SIZE = 224;
 
 // Below this confidence, the result is treated as "Unknown Plant".
 // Tune it against real phone photos, and re-check after retraining.
-const CONFIDENCE_THRESHOLD = 0.85;
+const CONFIDENCE_THRESHOLD = 0.70;
+
+// Similar Medicinal Plant screen (offered from the failure state):
+// candidates are the classes the model scored within SIMILAR_PLANT_RATIO
+// of its best guess — e.g. a 45% top score keeps everything ≥ 27% — shown
+// best-first and capped at MAX_SIMILAR_PLANTS. The cutoff is relative on
+// purpose: an absolute floor (e.g. ≥ 60%) would show nothing at all on
+// most failed scans, where the top score is usually far below it.
+const SIMILAR_PLANT_RATIO = 0.6;
+const MAX_SIMILAR_PLANTS = 5;
 
 export type PlantDetails = {
   scientific_name: string;
+  /** Short physical characteristics (1–3 words each, ≤6) — same list as
+   *  `traits` in data/plants.ts, mirrored here so model-side lookups
+   *  (getPlantDetailsBySlug) expose them too. Shown as chips on the
+   *  Similar Medicinal Plant screen. */
+  traits: string[];
   about: string;
   benefits: string[];
   preparation_methods: string[];
@@ -179,12 +193,22 @@ async function imageToInputTensor(uri: string): Promise<Float32Array> {
   return input;
 }
 
+/** One candidate on the Similar Medicinal Plant screen. */
+export type SimilarPlant = {
+  slug: string;
+  displayName: string;
+  score: number; // 0–1, this class's own model confidence
+};
+
 export type ClassificationResult = {
   slug: string;
   displayName: string;
   confidence: number; // 0–1
   identified: boolean; // false => treat as "Unknown Plant"
   details: PlantDetails | null; // null when !identified
+  /** Runner-ups (incl. the top guess) within SIMILAR_PLANT_RATIO of the
+   *  best score, best-first — only shown when the scan failed. */
+  similar: SimilarPlant[];
 };
 
 /**
@@ -229,12 +253,30 @@ export async function classifyPlantImage(
   const identified = bestScore >= CONFIDENCE_THRESHOLD;
   const details = identified ? plantInfo[slug] ?? null : null;
 
+  // Keep the runner-ups instead of discarding them — a failed scan offers
+  // these as "Similar Medicinal Plant" candidates. The top guess itself is
+  // INCLUDED (it's still the model's closest match, just under the gate),
+  // classes without a plant_info.json entry are skipped (their cards
+  // would have nothing to open), then best-first, capped at 5.
+  const cutoff = bestScore * SIMILAR_PLANT_RATIO;
+  const similar: SimilarPlant[] = Array.from(scores)
+    .map((score, index) => ({ score, index }))
+    .filter(({ score, index }) => score >= cutoff && plantInfo[labels[index]] != null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_SIMILAR_PLANTS)
+    .map(({ score, index }) => ({
+      slug: labels[index],
+      displayName: getDisplayName(labels[index]),
+      score,
+    }));
+
   return {
     slug,
     displayName: getDisplayName(slug),
     confidence: bestScore,
     identified: identified && details !== null, // guard against a slug with no matching entry
     details,
+    similar,
   };
 }
 

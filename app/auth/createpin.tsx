@@ -42,7 +42,11 @@ export default function CreatePinScreen() {
       } = await supabase.auth.getSession();
       if (session) await markPinVerified(session.user.id);
 
-      // No back-navigation into the sign-up form — the account is finished.
+      // The account is finished. Drop every auth screen (welcome, sign-up,
+      // PIN steps) from the history first — replace alone only swaps the
+      // top screen, which is what used to leave the finished sign-up form
+      // buried under Home for the back gesture to find.
+      router.dismissAll();
       router.replace("/tab/home");
     } catch (err) {
       console.error("[createpin] save failed:", err);

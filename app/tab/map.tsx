@@ -10,7 +10,7 @@
  * "arrive at" ourselves, rather than relying on a fixed walking-speed
  * assumption from the routing API.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -150,10 +150,15 @@ export default function MapScreen() {
   // we stop fighting the person's own panning. The small "Recenter"
   // button (shown only in that state) flips it back to true.
   const [followingUser, setFollowingUser] = useState(true);
-  // The center to actually feed the <Camera> while auto-follow is off —
-  // frozen at whatever it was when the person started panning, so we
-  // don't keep passing new center values that would re-trigger a fly-to.
+  // The center to actually feed the <Camera> while a manual pan is in
+  // effect (auto-follow paused mid-route, or browsing away from the last
+  // fed center) — kept at the SAME reference every render so <Camera>'s
+  // memo blocks updates and nothing re-triggers a fly-to mid-pan.
   const [frozenCenter, setFrozenCenter] = useState<[number, number] | null>(null);
+  // True after any manual pan/zoom — while browsing or mid-route — so
+  // the Recenter button can surface. Cleared when Recenter is pressed or
+  // a fresh navigation starts.
+  const [userPannedAway, setUserPannedAway] = useState(false);
 
   const watchSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   // True from the moment arrival is detected until the next directions
@@ -369,6 +374,7 @@ export default function MapScreen() {
     const target = posts.find((p) => p.id === postId);
     if (target) {
       setSelectedPost(target);
+      setFrozenCenter(null); // this fly is intentional — a stale pan-freeze must not swallow it
       setCameraCenter([target.longitude, target.latitude]);
     }
   }, [postId, posts]);
@@ -489,6 +495,7 @@ export default function MapScreen() {
     setRouting(true);
     setFollowingUser(true);
     setFrozenCenter(null);
+    setUserPannedAway(false);
     try {
       // Used only to draw the path on the map — its own ETA fields are
       // discarded in favor of the live, speed-based calculation below.
@@ -579,6 +586,7 @@ export default function MapScreen() {
 
     const match = posts.find((p) => p.name === name);
     if (match) {
+      setFrozenCenter(null); // search recenter wins over any pan-freeze
       setCameraCenter([match.longitude, match.latitude]);
     }
 
@@ -643,46 +651,87 @@ export default function MapScreen() {
     ? posts
     : posts.filter((p) => activeFilters.includes(p.name));
 
-  const liveCenter: [number, number] =
-    cameraCenter ??
-    (myLocation
-      ? [myLocation.longitude, myLocation.latitude]
-      : posts.length > 0
-      ? [posts[0].longitude, posts[0].latitude]
-      : [121.1631, 13.9411]); // fallback: Lipa City
+  // Memoized so the array's REFERENCE only changes when one of its
+  // inputs does. <Camera> is memo'd on this value and React diffs the
+  // stop prop by reference — a fresh-but-equal array would re-send the
+  // stop and yank a panned-away map back to this center (and zoom 14).
+  const liveCenter = useMemo<[number, number]>(
+    () =>
+      cameraCenter ??
+      (myLocation
+        ? [myLocation.longitude, myLocation.latitude]
+        : posts.length > 0
+        ? [posts[0].longitude, posts[0].latitude]
+        : [121.1631, 13.9411]), // fallback: Lipa City
+    [cameraCenter, myLocation, posts]
+  );
 
   const hasActiveRoute = routeGeometry !== null;
 
-  // While a route is active and the person has manually panned, keep
-  // feeding the SAME frozen value to <Camera> so it has nothing new to
-  // fly to — this is what actually stops the fight between GPS updates
-  // and manual panning. Outside of that state (browsing, or still
-  // following), just use the normal live center.
-  const cameraCenterToUse: [number, number] =
-    hasActiveRoute && !followingUser && frozenCenter ? frozenCenter : liveCenter;
+  // While a manual pan is in effect (auto-follow paused mid-route, or
+  // browsing away from the last fed center) keep feeding the SAME frozen
+  // value to <Camera> — same reference, so memo blocks the update and
+  // there's nothing new to fly to. This is what stops GPS updates and
+  // unrelated re-renders from fighting (or undoing) the person's panning.
+  const cameraCenterToUse: [number, number] = frozenCenter ?? liveCenter;
 
-  // Called from the Map's region-change event. MapLibre reports whether
-  // a region change came from a user gesture vs. a programmatic camera
-  // move — check this against your installed version's actual event
-  // payload shape, since the exact property name can vary by release
-  // (commonly `isUserInteraction` on the event or its properties).
+  // Called from the Map's region-change event. The installed MapLibre
+  // version reports the gesture-vs-programmatic split on nativeEvent as
+  // `userInteraction` + `animated`: touch gestures arrive as
+  // userInteraction && !animated, while our own <Camera> moves (search
+  // fly-tos, GPS follow, the recenter fly) arrive as animated — those
+  // must never count as "the person panned". (An earlier check read
+  // `isUserInteraction`, a property this version never sends, so it
+  // never fired at all.)
   function handleRegionWillChange(event: any) {
-    if (!hasActiveRoute || !followingUser) return;
-
+    const native = event?.nativeEvent;
     const isUserGesture =
-      event?.nativeEvent?.isUserInteraction ??
-      event?.nativeEvent?.properties?.isUserInteraction ??
-      event?.properties?.isUserInteraction;
+      native?.userInteraction === true && native?.animated !== true;
+    if (!isUserGesture) return;
 
-    if (isUserGesture) {
-      setFrozenCenter(liveCenter);
-      setFollowingUser(false);
-    }
+    // Freeze at the exact value already being fed to <Camera> — same
+    // reference, so flipping this state can't fire a fly-to of its own.
+    // `prev ??` keeps the first frozen value: later pans never re-send.
+    setFrozenCenter((prev) => prev ?? liveCenter);
+    setUserPannedAway(true);
+    setFollowingUser(false);
   }
 
+  // Recenter — snap the map back to the person's location. Flags flip
+  // first (icon hides instantly, and mid-route auto-follow resumes from
+  // the latest GPS value since liveCenter's reference changes with
+  // myLocation); then a fresh fix is fetched so the fly-to value differs
+  // from whatever <Camera> last saw — identical coordinates would
+  // memo-block the update and the tap would look dead.
   function handleRecenter() {
     setFollowingUser(true);
     setFrozenCenter(null);
+    setUserPannedAway(false);
+    applyRecenterFix();
+  }
+
+  async function applyRecenterFix() {
+    try {
+      const position = await Location.getCurrentPositionAsync({});
+      const fix: Coordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      setMyLocation(fix);
+      // Mid-route: drop cameraCenter instead of setting it — while it's
+      // set, liveCenter keeps preferring it and the camera would pin to
+      // stale search coords instead of following the fix. Browsing:
+      // point cameraCenter at the fix so the camera flies there even if
+      // it's frozen at a panned-away position.
+      setCameraCenter(hasActiveRoute ? null : [fix.longitude, fix.latitude]);
+    } catch (err) {
+      console.error("[map] recenter fix failed:", err);
+      // Fall back to the last known fix — assigned as a brand-new array
+      // so the reference still changes and the camera still flies.
+      if (!hasActiveRoute && myLocation) {
+        setCameraCenter([myLocation.longitude, myLocation.latitude]);
+      }
+    }
   }
 
   return (
@@ -918,11 +967,16 @@ export default function MapScreen() {
               />
             )}
 
-            {/* Recenter — only once a manual pan has paused auto-follow
-                during active navigation. Tapping it snaps back to the
-                live position and re-enables auto-follow. Top-left,
-                below the chips row, per the mockup. */}
-            {hasActiveRoute && !followingUser && (
+            {/* Recenter — surfaces after ANY manual pan (browsing or
+                mid-navigation), plus the old "navigation panned away
+                from auto-follow" state. Tapping it snaps back to a
+                fresh location fix. Top-left, below the chips row, per
+                the mockup. Hidden while search is open (its overlay
+                owns the screen) and without a fix — nothing to recenter
+                to, and guests never get a permission prompt from it. */}
+            {myLocation &&
+              !searchOpen &&
+              (userPannedAway || (hasActiveRoute && !followingUser)) && (
               <Pressable
                 onPress={handleRecenter}
                 hitSlop={8}
