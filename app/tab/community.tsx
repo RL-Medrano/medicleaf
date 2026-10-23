@@ -61,8 +61,9 @@ const ICONS = {
   search: require("../../assets/images/icons/search.png"),
   placeholder: require("../../assets/images/icons/place_holder.png"),
   send: require("../../assets/images/icons/send icon.png"),
-  // Comment bubble on a feed card → opens the Comments sheet.
-  comment: require("../../assets/images/icons/Message.png"),
+  // Comment bubble on a feed card → opens the Comments sheet
+  // (mockup: dark message-circle outline beside the "Comment" label).
+  comment: require("../../assets/images/icons/message-circle.png"),
 };
 
 // Avatar shown when the user has no profile picture (mockup: place_holder.png).
@@ -703,21 +704,6 @@ export default function CommunityScreen() {
                 `(${getPlantDetailsBySlug(item.plant_slug)!.scientific_name})`}
             </Text>
           </View>
-
-          {/* Comment bubble (mockup: top-right of the card) — opens the
-              Comments sheet for this post. Only reachable signed-in: for
-              guests the whole feed is replaced by GuestPrompt. */}
-          <Pressable
-            onPress={() => setCommentsPostId(item.id)}
-            hitSlop={10}
-            className="ml-2"
-          >
-            <Image
-              source={ICONS.comment}
-              style={{ width: 26, height: 26, tintColor: "#1A1A1A" }}
-              resizeMode="contain"
-            />
-          </Pressable>
         </View>
 
         <Text className="mt-3" style={{ color: "#1A1A1A", fontSize: 15 }}>
@@ -733,9 +719,49 @@ export default function CommunityScreen() {
           />
         </Pressable>
 
+        {/* Location (mockup: its own underlined line below the photo) —
+            short "brgy., city, province" form; tapping opens the Map tab,
+            which shows the FULL address. */}
+        {item.location_name && (
+          <Pressable
+            onPress={() => handleLocationPress(item)}
+            disabled={item.latitude == null || item.longitude == null}
+            hitSlop={8}
+            className="mt-3 self-start"
+          >
+            <Text
+              className="underline"
+              numberOfLines={1}
+              style={{ color: "#6b7280", fontSize: 13 }}
+            >
+              {shortLocation(item.location_name)}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* Divider above the action row (mockup) */}
+        <View style={{ height: 1, backgroundColor: "#F0F0F0", marginTop: 12 }} />
+
+        {/* Action row (mockup): Comment on the left opens this post's
+            Comments sheet — only reachable signed-in, since guests see
+            GuestPrompt instead of the feed. Send Message on the right opens
+            the chat with this post attached; hidden on your own posts
+            (messaging yourself would show every sent message twice, once as
+            sent and once as "incoming"). */}
         <View className="flex-row items-center justify-between mt-3">
-          {/* Hidden on your own posts — messaging yourself would show every
-              sent message twice, once as sent and once as "incoming". */}
+          <Pressable
+            onPress={() => setCommentsPostId(item.id)}
+            className="flex-row items-center"
+            hitSlop={8}
+          >
+            <Image
+              source={ICONS.comment}
+              style={{ width: 20, height: 20, marginRight: 6 }}
+              resizeMode="contain"
+            />
+            <Text style={{ color: "#1A1A1A", fontSize: 15 }}>Comment</Text>
+          </Pressable>
+
           {item.user_id !== currentUserId ? (
             <Pressable
               onPress={() => handleSendMessage(item)}
@@ -757,30 +783,6 @@ export default function CommunityScreen() {
             </Pressable>
           ) : (
             <View />
-          )}
-
-          {item.location_name && (
-            <Pressable
-              onPress={() => handleLocationPress(item)}
-              disabled={item.latitude == null || item.longitude == null}
-              hitSlop={8}
-              style={{ flexShrink: 1 }}
-            >
-              {/* Short "brgy., city, province" form per the mockup — tapping
-                  opens the Map tab, which shows the FULL address. */}
-              <Text
-                className="underline"
-                numberOfLines={1}
-                style={{
-                  color: "#6b7280",
-                  fontSize: 13,
-                  flexShrink: 1,
-                  textAlign: "right",
-                }}
-              >
-                {shortLocation(item.location_name)}
-              </Text>
-            </Pressable>
           )}
         </View>
       </View>

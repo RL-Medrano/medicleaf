@@ -6,9 +6,10 @@
  *   • Single tap → drops / moves the pin, but ONLY when the caller passes
  *     `onPinChange`. Without it the map is view-only: the photo's own
  *     location is displayed and can't be edited.
- *   • Double tap → opens the map full screen so the user can look around.
- *     The X button at the top-right closes it (the Android back button
- *     does too — see onRequestClose below).
+ *   • Double tap → opens the map full screen so the user can look around
+ *     — unless `allowFullView` is false (Pin Location switched off), when
+ *     the map stays inline only. The X button at the top-right closes it
+ *     (the Android back button does too — see onRequestClose below).
  *
  * Why the double tap needs react-native-gesture-handler:
  * MapLibre's Android build dispatches `onPress` from
@@ -56,11 +57,24 @@ const BLANK_MAP_STYLE = {
 // Fallback centre until a pin exists — Lipa City, Batangas.
 export const DEFAULT_MAP_CENTER: [number, number] = [121.1631, 13.9411];
 
+// Wider stop for an empty map when the phone's own position is
+// unavailable: Luzon, so the view frames the island instead of the
+// whole country. (The camera only — never a saved location.)
+export const LUZON_CENTER: MapCoord = { latitude: 15.8, longitude: 121.3 };
+export const LUZON_ZOOM = 6;
+
 const CLOSE_ICON = require("../assets/images/icons/close.png");
 
 type PinMapProps = {
   /** Current pin, or null when there isn't one yet. */
   coord: MapCoord | null;
+  /**
+   * Where the camera aims while there's no pin — typically the phone's
+   * last known position, or the Luzon view. A viewport only: it is never
+   * drawn as a marker (that happens only for `coord`) and never saved.
+   * Omitted → DEFAULT_MAP_CENTER (Lipa).
+   */
+  fallbackCenter?: MapCoord;
   /**
    * Called with the tapped coordinate (single taps only). Omit it for a
    * view-only map — taps then do nothing and only double-tap (full screen)
@@ -77,6 +91,12 @@ type PinMapProps = {
   showPin?: boolean;
   /** Ignore taps (e.g. Pin Location switched off). */
   disabled?: boolean;
+  /**
+   * Allow the double-tap full-screen view (default). Set it false when
+   * Pin Location is switched off: the inline map stays visible but can't
+   * be opened full screen.
+   */
+  allowFullView?: boolean;
   /** Extra element drawn over the inline map (e.g. the locating spinner). */
   overlay?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -84,12 +104,14 @@ type PinMapProps = {
 
 export default function PinMap({
   coord,
+  fallbackCenter,
   onPinChange,
   zoom,
   height = 170,
   borderRadius = 16,
   showPin = true,
   disabled = false,
+  allowFullView = true,
   overlay,
   style,
 }: PinMapProps) {
@@ -110,15 +132,18 @@ export default function PinMap({
         // on the UI Runtime").
         .runOnJS(true)
         .onEnd((_event, success) => {
-          if (success) setExpanded(true);
+          if (success && allowFullView) setExpanded(true);
         }),
-    []
+    [allowFullView]
   );
 
-  // Centered on the pin once there is one, otherwise on the fallback.
+  // Centered on the pin once there is one, otherwise on the caller's
+  // fallback (last known position / Luzon), else the Lipa default.
   const center: [number, number] = coord
     ? [coord.longitude, coord.latitude]
-    : DEFAULT_MAP_CENTER;
+    : fallbackCenter
+      ? [fallbackCenter.longitude, fallbackCenter.latitude]
+      : DEFAULT_MAP_CENTER;
 
   function handlePress(event: any) {
     // View-only mode (no onPinChange) — taps must never move the pin.

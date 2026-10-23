@@ -11,11 +11,13 @@ import {
   ActivityIndicator,
   BackHandler,
   Modal,
+  Switch,
   StyleSheet,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import PinMap from "@/components/PinMap";
+import PinMap, { LUZON_CENTER, LUZON_ZOOM } from "@/components/PinMap";
+import { getLastKnownCenter } from "@/utils/photoLocation";
 import { supabase } from "@/utils/supabase";
 import { checkIsOnline } from "@/utils/network";
 import { reverseGeocode } from "@/utils/geoapify";
@@ -53,8 +55,16 @@ export default function EditPostScreen() {
   // this post never had a location), and Save writes it back with its
   // freshly resolved label.
   const [coord, setCoord] = useState<Coord | null>(null);
+  // The phone's last known position — camera-only starting view for the
+  // empty map (never saved as the post's location). Null → the Luzon view.
+  const [userCenter, setUserCenter] = useState<Coord | null>(null);
   const [locationName, setLocationName] = useState<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
+  // Pin Location switch — starts ON, same as Create Post: the user
+  // decides whether this edit keeps a location. Off means the save
+  // clears it (even a stored one), hides the pin, ignores map taps, and
+  // blocks the full-screen view.
+  const [pinEnabled, setPinEnabled] = useState(true);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Full-screen viewer — tapping the post image opens it here.
   const [viewerUri, setViewerUri] = useState<string | null>(null);
@@ -69,15 +79,32 @@ export default function EditPostScreen() {
   // caption (trimmed; an empty caption is stored as null) and the pin's
   // position — both, since either one can change before saving.
   const captionChanged = post != null && (caption.trim() || null) !== (post.caption ?? null);
+  // What the save would actually store: the pin gated by the Pin Location
+  // switch (off = the location is being removed). Dirty compares against
+  // that effective value, so a switch flip that nets out to what's already
+  // saved isn't an unsaved change.
+  const savedCoord = pinEnabled ? coord : null;
   const locationChanged =
     post != null &&
-    (((coord?.latitude ?? null) !== (post.latitude ?? null)) ||
-      ((coord?.longitude ?? null) !== (post.longitude ?? null)));
+    (((savedCoord?.latitude ?? null) !== (post.latitude ?? null)) ||
+      ((savedCoord?.longitude ?? null) !== (post.longitude ?? null)));
   const dirty = captionChanged || locationChanged;
 
   useEffect(() => {
     loadPost();
   }, [postId]);
+
+  // Silent one-time read (permission checked, never requested) so an
+  // empty map opens zoomed on the user instead of the whole country.
+  useEffect(() => {
+    let alive = true;
+    getLastKnownCenter().then((c) => {
+      if (alive && c) setUserCenter(c);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // The hardware back button must ask before discarding edits, exactly like
   // the header back button. Confirmation Modals intercept back themselves
@@ -172,8 +199,9 @@ export default function EditPostScreen() {
 
     // Never save a pin while its label is still being resolved — the
     // location_name must always match the latitude/longitude stored with
-    // it (same guard as Create Post).
-    if (coord && geocoding) {
+    // it (same guard as Create Post). Pin Location off saves nothing
+    // location-related, so there's nothing to wait for.
+    if (pinEnabled && coord && geocoding) {
       Alert.alert(
         "Naming this spot",
         "Hang on a moment while we name this location, then tap Save again."
@@ -192,14 +220,15 @@ export default function EditPostScreen() {
       // Caption and location — the photo itself is never touched, and
       // created_at is never written either, so the post keeps its
       // original date and time. Coord and label travel together, guarded
-      // above so they can never disagree.
+      // above so they can never disagree — and all three clear together
+      // when Pin Location is switched off.
       const { error } = await supabase
         .from("posts")
         .update({
           caption: caption.trim() || null,
-          latitude: coord ? coord.latitude : null,
-          longitude: coord ? coord.longitude : null,
-          location_name: coord ? locationName : null,
+          latitude: pinEnabled && coord ? coord.latitude : null,
+          longitude: pinEnabled && coord ? coord.longitude : null,
+          location_name: pinEnabled && coord ? locationName : null,
         })
         .eq("id", post.id);
       if (error) throw error;
@@ -225,8 +254,9 @@ export default function EditPostScreen() {
     ? getPlantDetailsBySlug(post.plant_slug)?.scientific_name
     : null;
   // The pin's label is still being fetched — Save waits for it so the
-  // stored location_name can never disagree with the stored coordinates.
-  const naming = coord != null && geocoding;
+  // stored location_name can never disagree with the stored coordinates
+  // (only while Pin Location is on; off saves no location at all).
+  const naming = pinEnabled && coord != null && geocoding;
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: "#D8F3DC" }} edges={["top"]}>
@@ -296,37 +326,60 @@ export default function EditPostScreen() {
 
           {/* Location — starts at the photo's own spot; a tap anywhere on
               the map moves the pin there (or adds the first one when this
-              post never had a location). */}
+              post never had a location). Pin Location off = the map stays
+              on screen, but taps and the full-screen view are blocked. */}
           <Text className="font-bold mt-4" style={{ color: "#000000" }}>
             Where did you find it?
           </Text>
           <Text className="text-xs" style={{ color: "#6b7280" }}>
-            {coord
-              ? "Tap the map to move the pin — double-tap to view it full screen"
-              : "Tap the map to place the pin — double-tap to view it full screen"}
+            {pinEnabled
+              ? coord
+                ? "Tap the map to move the pin — double-tap to view it full screen"
+                : "Tap the map to place the pin — double-tap to view it full screen"
+              : "Pin Location is off — this post won't include a location."}
           </Text>
 
           <PinMap
             coord={coord}
-            onPinChange={handlePinChange}
-            zoom={coord ? 15 : 5}
+            fallbackCenter={userCenter ?? LUZON_CENTER}
+            onPinChange={pinEnabled ? handlePinChange : undefined}
+            zoom={coord || userCenter ? 15 : LUZON_ZOOM}
             height={170}
             borderRadius={20}
             style={{ marginTop: 8 }}
+            showPin={pinEnabled}
+            disabled={!pinEnabled}
+            allowFullView={pinEnabled}
           />
-          {locationName ? (
-            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-              {locationName}
+          {/* Pin Location switch — always starts on; the user decides
+              whether the edit keeps a location. */}
+          <View className="flex-row items-center mt-3">
+            <Switch
+              value={pinEnabled}
+              onValueChange={setPinEnabled}
+              trackColor={{ false: "#D1D5DB", true: "#40916C" }}
+              thumbColor="#FFFFFF"
+            />
+            <Text className="ml-3" style={{ color: "#6b7280", fontSize: 13 }}>
+              Pin Location
             </Text>
-          ) : geocoding ? (
-            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-              Naming this spot...
-            </Text>
-          ) : coord ? null : (
-            <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
-              This post doesn't include a location — tap the map to add one.
-            </Text>
-          )}
+          </View>
+
+          {pinEnabled ? (
+            locationName ? (
+              <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                {locationName}
+              </Text>
+            ) : geocoding ? (
+              <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                Naming this spot...
+              </Text>
+            ) : coord ? null : (
+              <Text className="text-xs mt-2" style={{ color: "#6b7280" }}>
+                This post doesn't include a location — tap the map to add one.
+              </Text>
+            )
+          ) : null}
 
           {/* Save */}
           <Pressable

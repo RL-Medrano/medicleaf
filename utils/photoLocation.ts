@@ -52,6 +52,35 @@ export async function getCaptureLocation(): Promise<PhotoCoords | null> {
   return null;
 }
 
+/**
+ * Best-effort centre for an EMPTY map (no pin): the phone's last known
+ * position — read SILENTLY (permission is only checked, never requested)
+ * and without taking a fresh GPS fix, so it's instant and costs no
+ * battery. Returns null when permission isn't granted or nothing is
+ * cached, and the caller falls back to a wider default view.
+ *
+ * This is purely where the map LOOKS: it is never attached to a post as
+ * its location (that still only comes from the photo itself or a tap).
+ */
+export async function getLastKnownCenter(): Promise<PhotoCoords | null> {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== "granted") return null;
+  } catch {
+    return null;
+  }
+
+  try {
+    const last = await Location.getLastKnownPositionAsync();
+    if (last) {
+      return { latitude: last.coords.latitude, longitude: last.coords.longitude };
+    }
+  } catch {
+    // Nothing cached — the caller falls back to the Luzon view.
+  }
+  return null;
+}
+
 function toNumber(value: unknown): number | null {
   const n =
     typeof value === "number"
