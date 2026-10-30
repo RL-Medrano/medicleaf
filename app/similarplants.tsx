@@ -17,7 +17,7 @@ type Candidate = {
 /**
  * "Similar Medicinal Plant" — offered from the Failed-to-Detect state when
  * the model recognized nothing confidently but had nearby guesses (within
- * 60% of its best score, top 5 — see SIMILAR_PLANT_RATIO in
+ * 30% of its best score, top 5 — see SIMILAR_PLANT_RATIO in
  * utils/plantClassifier.ts). Tapping a card opens the existing plant
  * detail / library screen for that plant.
  */

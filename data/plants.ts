@@ -2,15 +2,25 @@ import type { ImageSourcePropType } from "react-native";
 
 export type PlantTag =
   | "Cough"
+  | "Ubo"
   | "Fever"
+  | "Lagnat"
   | "Indigestion"
+  | "Sakit ng tiyan"
   | "Wound"
+  | "Sugat"
   | "Diabetes"
+  | "Diyabetis"
   | "Skin Care"
+  | "Sakit sa balat"
   | "Kidney & Urinary"
+  | "Bato sa bato"
   | "Joint & Pain Relief"
+  | "sakit sa katawan"
   | "Nutrition & Immunity"
-  | "Digestive Health";
+  | "Pampalakas ng katawan"
+  | "Digestive Health"
+  | "Problema sa tiyan";
 
 export type PreparationMethod = {
   title: string;
@@ -47,7 +57,7 @@ export const PLANTS: Plant[] = [
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/akapulko.jpg"),
     images: [require("@/assets/images/plants/akapulko.jpg"), require("@/assets/images/plants/akapulko-2.jpg"), require("@/assets/images/plants/akapulko-3.jpg"), require("@/assets/images/plants/akapulko-4.jpg"), require("@/assets/images/plants/akapulko-5.jpg")],
-    tags: ["Skin Care", "Wound"],
+    tags: ["Skin Care", "Sakit sa balat", "Wound", "Sugat"],
     about:
       "Akapulko, often nicknamed the \"ringworm bush,\" is a tall shrub that is easy to spot because of its bright yellow flower spikes that stand upright like candles, and its long leaves made of many pairs of rounded leaflets. It grows freely along roadsides, empty lots, and backyards all over the Philippines, and does well in both full sun and partial shade. For generations, Filipino families have picked its fresh leaves as the first thing to try for itchy, fungus-type skin problems such as ringworm, athlete's foot, and skin patches that keep coming back. It is one of the ten herbal plants endorsed by the Philippine Department of Health, and it is usually applied on the skin rather than taken by mouth. Many households prepare it as a simple rub or wash and keep a plant nearby so fresh leaves are always within reach.",
     benefits: [
@@ -89,7 +99,7 @@ export const PLANTS: Plant[] = [
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/alagao.jpg"),
     images: [require("@/assets/images/plants/alagao.jpg"), require("@/assets/images/plants/alagao-2.jpg"), require("@/assets/images/plants/alagao-3.jpg"), require("@/assets/images/plants/alagao-4.jpg"), require("@/assets/images/plants/alagao-5.jpg")],
-    tags: ["Cough", "Fever"],
+    tags: ["Cough", "Ubo", "Fever", "Lagnat"],
     about:
       "Alagao is a small tree or large shrub that grows in lowland areas and thickets throughout the Philippines. Its leaves give off a distinct, slightly sharp smell when crushed, which many people recognize right away. It is closely related to Lagundi and has a long history of traditional household use in very similar ways, especially for cough, colds, and mild fever — these are family remedies passed down through generations, not clinically established treatments. In provinces where Lagundi is harder to find, Alagao is often the go-to household remedy. Families usually boil the leaves into a warm drink, sometimes with a slice of ginger added for extra warmth and comfort, and the same liquid can be used to gargle when the throat feels scratchy or sore.",
     benefits: [
@@ -131,7 +141,7 @@ export const PLANTS: Plant[] = [
     family: "Asphodelaceae (Aloe family)",
     imageUrl: require("@/assets/images/plants/aloe-vera.jpg"),
     images: [require("@/assets/images/plants/aloe-vera.jpg"), require("@/assets/images/plants/aloe-vera-2.jpg"), require("@/assets/images/plants/aloe-vera-3.jpg"), require("@/assets/images/plants/aloe-vera-4.jpg"), require("@/assets/images/plants/aloe-vera-5.jpg")],
-    tags: ["Skin Care", "Wound"],
+    tags: ["Skin Care", "Sakit sa balat", "Wound", "Sugat"],
     about:
       "Aloe vera is a thick, fleshy plant with long, pointed leaves that store water inside. When you cut a leaf open, you find a clear, slippery, cooling gel with a long traditional history of simple skin care — used to soothe and support the skin, not as a proven medical treatment. It is a common potted plant in Filipino homes, often kept near the door or window so it can be reached quickly when someone gets a sunburn, a small burn from the stove, or dry, itchy skin. The gel feels cool and soothing right away, keeps the skin moist, and is also popular as a natural conditioner for hair and scalp. Many store-bought lotions and gels use aloe, but fresh gel straight from the leaf is simple and inexpensive to use at home.",
     benefits: [
@@ -173,7 +183,7 @@ export const PLANTS: Plant[] = [
     family: "Cucurbitaceae (Gourd family)",
     imageUrl: require("@/assets/images/plants/ampalaya.jpg"),
     images: [require("@/assets/images/plants/ampalaya.jpg"), require("@/assets/images/plants/ampalaya-2.jpg"), require("@/assets/images/plants/ampalaya-3.jpg"), require("@/assets/images/plants/ampalaya-4.jpg"), require("@/assets/images/plants/ampalaya-5.jpg")],
-    tags: ["Diabetes", "Digestive Health"],
+    tags: ["Diabetes", "Diyabetis", "Digestive Health", "Problema sa tiyan"],
     about:
       "Ampalaya, also called bitter melon or bitter gourd, is a climbing vine that grows the bumpy, green, very bitter fruit found in favorite dishes like pinakbet and ginisang ampalaya. It is one of the best-known medicinal plants in the Philippines and is recognized by the Department of Health for its traditional use in supporting healthy blood sugar (glycemic) control — support, not a cure. Both the fruit and the leaves are used: the fruit is cooked as a vegetable, and the leaves are boiled into a tea. Many Filipino families with a member who watches their sugar intake include ampalaya in regular meals. Its bitterness is part of its character — the more bitter the fruit, the more people associate it with its traditional benefits.",
     benefits: [
@@ -215,7 +225,7 @@ export const PLANTS: Plant[] = [
     family: "Muntingiaceae",
     imageUrl: require("@/assets/images/plants/aratiles.jpg"),
     images: [require("@/assets/images/plants/aratiles.jpg"), require("@/assets/images/plants/aratiles-2.jpg"), require("@/assets/images/plants/aratiles-3.jpg"), require("@/assets/images/plants/aratiles-4.jpg"), require("@/assets/images/plants/aratiles-5.jpg")],
-    tags: ["Fever", "Cough", "Joint & Pain Relief"],
+    tags: ["Fever", "Lagnat", "Cough", "Ubo", "Joint & Pain Relief", "sakit sa katawan"],
     about:
       "Aratiles, also known as Jamaican cherry or Panama berry, is a fast-growing tree that provides good shade and is common in vacant lots, schoolyards, and roadsides. It is easy to recognize by its tiny, sweet, red berries that ripen almost all year round and by its small white flowers. For many Filipino kids, climbing an aratiles tree to snack on its fruit is a childhood memory. Beyond being a treat, its leaves and flowers have a long history of traditional home use for headaches, body pains, colds, and mild swelling — evidence for these uses is still experimental rather than proven. The tea made from them is mild and gently sweet, making it a comfortable drink for the whole family.",
     benefits: [
@@ -257,7 +267,7 @@ export const PLANTS: Plant[] = [
     family: "Annonaceae (Custard-apple family)",
     imageUrl: require("@/assets/images/plants/atis.jpg"),
     images: [require("@/assets/images/plants/atis.jpg"), require("@/assets/images/plants/atis-2.jpg"), require("@/assets/images/plants/atis-3.jpg"), require("@/assets/images/plants/atis-4.jpg"), require("@/assets/images/plants/atis-5.jpg")],
-    tags: ["Digestive Health", "Skin Care"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Skin Care", "Sakit sa balat"],
     about:
       "Atis, also called sugar apple, is a small tree grown across the Philippines for its sweet, creamy fruit that has a bumpy, green skin and black seeds inside. When ripe, the fruit is soft and easily pulled apart, and the sweet white flesh is a treat in the hot season. Besides the fruit, the leaves have a place in home remedies for upset stomach and minor skin problems. They are usually boiled into a tea or crushed into a paste. The seeds, however, are not for eating and are never used as medicine — in the past they were crushed and used as a natural pest killer, which shows why they should be kept away from the mouth and eyes.",
     benefits: [
@@ -299,7 +309,7 @@ export const PLANTS: Plant[] = [
     family: "Lythraceae (Loosestrife family)",
     imageUrl: require("@/assets/images/plants/banaba.jpg"),
     images: [require("@/assets/images/plants/banaba.jpg"), require("@/assets/images/plants/banaba-2.jpg"), require("@/assets/images/plants/banaba-3.jpg"), require("@/assets/images/plants/banaba-4.jpg"), require("@/assets/images/plants/banaba-5.jpg")],
-    tags: ["Diabetes", "Kidney & Urinary"],
+    tags: ["Diabetes", "Diyabetis", "Kidney & Urinary", "Bato sa bato"],
     about:
       "Banaba is a medium-sized tree known for its beautiful purple-pink flowers, and it is often planted along streets and in parks for its shade and color. It is recognized by the Department of Health for its traditional use in supporting healthy blood sugar levels, and its leaves are the part used — it supports, but does not cure, diabetes. Banaba is also valued for supporting the kidneys and the urinary system. Unlike remedies taken only when someone is sick, banaba tea is usually taken as a daily wellness drink, a bit like regular tea, and many families in the provinces keep dried leaves in the kitchen for this purpose.",
     benefits: [
@@ -341,7 +351,7 @@ export const PLANTS: Plant[] = [
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/basil.jpg"),
     images: [require("@/assets/images/plants/basil.jpg"), require("@/assets/images/plants/basil-2.jpg"), require("@/assets/images/plants/basil-3.jpg"), require("@/assets/images/plants/basil-4.jpg"), require("@/assets/images/plants/basil-5.jpg")],
-    tags: ["Digestive Health", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Basil is a fragrant, easy-to-grow herb often found in home gardens and pots. Its soft green leaves have a sweet, slightly peppery smell and are used in cooking as well as in gentle home remedies. A cup of basil tea after a big meal is a familiar way to ease a bloated or gassy stomach, and its aroma alone has a calming effect for many people. It grows quickly, and regularly picking the leaves actually makes the plant grow bushier, so a single pot can supply a household for months.",
     benefits: [
@@ -383,7 +393,7 @@ export const PLANTS: Plant[] = [
     family: "Myrtaceae (Myrtle family)",
     imageUrl: require("@/assets/images/plants/bayabas.jpg"),
     images: [require("@/assets/images/plants/bayabas.jpg"), require("@/assets/images/plants/bayabas-2.jpg"), require("@/assets/images/plants/bayabas-3.jpg"), require("@/assets/images/plants/bayabas-4.jpg"), require("@/assets/images/plants/bayabas-5.jpg")],
-    tags: ["Wound", "Digestive Health"],
+    tags: ["Wound", "Sugat", "Digestive Health", "Problema sa tiyan"],
     about:
       "Bayabas, or guava, is a small tree found in almost every Philippine backyard. Most people know it for its sweet-sour fruit, but the leaves are just as valued at home. Boiled guava leaf water is the classic Filipino way to clean small wounds and cuts, and it is also used as a mouth rinse for sore gums and bad breath. A warm cup of the same leaf tea has long been used to settle an upset stomach and loose bowel movement. In many rural homes, guava leaves are treated as an important part of the first-aid kit.",
     benefits: [
@@ -425,7 +435,7 @@ export const PLANTS: Plant[] = [
     family: "Phyllanthaceae",
     imageUrl: require("@/assets/images/plants/bignay.jpg"),
     images: [require("@/assets/images/plants/bignay.jpg"), require("@/assets/images/plants/bignay-2.jpg"), require("@/assets/images/plants/bignay-3.jpg"), require("@/assets/images/plants/bignay-4.jpg"), require("@/assets/images/plants/bignay-5.jpg")],
-    tags: ["Digestive Health", "Kidney & Urinary", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Kidney & Urinary", "Bato sa bato", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Bignay is a tree native to the Philippines, known for its long, hanging bunches of small berries that change from green to red to dark purple-black as they ripen. The ripe fruits are tart with a touch of sweetness, and are often made into wine, jam, juice, or vinegar. The deep color of the fruit is a sign of its rich nutrition. The leaves are also boiled into a tea in traditional remedies for digestive and urinary comfort. A bignay tree loaded with berries is a beautiful sight and a favorite among families who make homemade preserves.",
     benefits: [
@@ -467,7 +477,7 @@ export const PLANTS: Plant[] = [
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/calamansi.jpg"),
     images: [require("@/assets/images/plants/calamansi.jpg"), require("@/assets/images/plants/calamansi-2.jpg"), require("@/assets/images/plants/calamansi-3.jpg"), require("@/assets/images/plants/calamansi-4.jpg"), require("@/assets/images/plants/calamansi-5.jpg")],
-    tags: ["Cough", "Nutrition & Immunity"],
+    tags: ["Cough", "Ubo", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Calamansi is a small, round, sour citrus fruit, sometimes called the Philippine lime, that is found in almost every Filipino kitchen. It is squeezed over pancit, grilled fish, and sawsawan, and it is also one of the most common things people reach for at the first sign of a cough or cold. A warm drink of calamansi juice with honey is a classic home remedy passed down through families. The fruit is high in vitamin C, and both the juice and the peel have uses at home, from drinks to cleaning to freshening hair and skin.",
     benefits: [
@@ -509,7 +519,7 @@ export const PLANTS: Plant[] = [
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/cassava.jpg"),
     images: [require("@/assets/images/plants/cassava.jpg"), require("@/assets/images/plants/cassava-2.jpg"), require("@/assets/images/plants/cassava-3.jpg"), require("@/assets/images/plants/cassava-4.jpg"), require("@/assets/images/plants/cassava-5.jpg")],
-    tags: ["Nutrition & Immunity"],
+    tags: ["Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Cassava is a hardy root crop grown all over the Philippines, and it grows well even in poor soil where other crops struggle. The long brown roots are starchy and filling, making cassava an affordable source of energy for many families, especially in places where rice is expensive or hard to find. It is boiled, steamed, fried, or turned into favorite treats like kakanin, cassava cake, and suman. Because it is filling and easy to digest when cooked properly, it is also a common food during recovery from illness. It must always be cooked well, because raw or undercooked cassava can be harmful.",
     benefits: [
@@ -551,7 +561,7 @@ export const PLANTS: Plant[] = [
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/dayap.jpg"),
     images: [require("@/assets/images/plants/dayap.jpg"), require("@/assets/images/plants/dayap-2.jpg"), require("@/assets/images/plants/dayap-3.jpg"), require("@/assets/images/plants/dayap-4.jpg"), require("@/assets/images/plants/dayap-5.jpg")],
-    tags: ["Cough", "Digestive Health", "Nutrition & Immunity"],
+    tags: ["Cough", "Ubo", "Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Dayap, the Philippine lime, is a small, very sour citrus fruit that looks like calamansi but is a little larger and rounder, with a strong lime scent. It is used in much the same way as calamansi — squeezed into drinks, sauces, and soups, and enjoyed at home as a warm vitamin C drink at the first sign of a cough or cold. Many people also use its juice for an upset stomach or after a heavy, oily meal, since its sharp sourness cuts through richness. The green fruit is very juicy when ripe and gives off a lovely fragrance when the skin is scratched.",
     benefits: [
@@ -593,7 +603,7 @@ export const PLANTS: Plant[] = [
     family: "Malvaceae (Mallow family)",
     imageUrl: require("@/assets/images/plants/gumamela.jpg"),
     images: [require("@/assets/images/plants/gumamela.jpg"), require("@/assets/images/plants/gumamela-2.jpg"), require("@/assets/images/plants/gumamela-3.jpg"), require("@/assets/images/plants/gumamela-4.jpg"), require("@/assets/images/plants/gumamela-5.jpg")],
-    tags: ["Fever", "Cough", "Joint & Pain Relief"],
+    tags: ["Fever", "Lagnat", "Cough", "Ubo", "Joint & Pain Relief", "sakit sa katawan"],
     about:
       "Gumamela, or the hibiscus flower, is a familiar sight in Philippine yards and fences, with big, colorful blooms in red, pink, yellow, and white. It is grown as much for decoration as for home use. The flowers and leaves are used in remedies for fever and cough, and the crushed leaves are sometimes placed on swollen spots. The flower tea has a mild, slightly tart flavor and a pretty color. In many homes, gumamela flowers are also used for hair care, with crushed petals rubbed into the scalp to keep it healthy-looking.",
     benefits: [
@@ -635,7 +645,7 @@ export const PLANTS: Plant[] = [
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/ipil-ipil.jpg"),
     images: [require("@/assets/images/plants/ipil-ipil.jpg"), require("@/assets/images/plants/ipil-ipil-2.jpg"), require("@/assets/images/plants/ipil-ipil-3.jpg"), require("@/assets/images/plants/ipil-ipil-4.jpg"), require("@/assets/images/plants/ipil-ipil-5.jpg")],
-    tags: ["Wound", "Digestive Health"],
+    tags: ["Wound", "Sugat", "Digestive Health", "Problema sa tiyan"],
     about:
       "Ipil-ipil is a fast-growing tree with fine, feathery leaves and small white flower balls, found all over the Philippine countryside. It is often planted as a natural fence or to protect soil and bring back the health of tired land. Its leaves have a long history in home remedies for cleaning wounds, and in some places the young leaves are also cooked as food in small amounts. Its seeds have been used in folk medicine, but they need great caution and are best left alone. Ipil-ipil is also valued by farmers as animal feed and firewood.",
     benefits: [
@@ -672,7 +682,7 @@ export const PLANTS: Plant[] = [
     family: "Balsaminaceae (Touch-me-not family)",
     imageUrl: require("@/assets/images/plants/kamantigi.jpg"),
     images: [require("@/assets/images/plants/kamantigi.jpg"), require("@/assets/images/plants/kamantigi-2.jpg"), require("@/assets/images/plants/kamantigi-3.jpg"), require("@/assets/images/plants/kamantigi-4.jpg"), require("@/assets/images/plants/kamantigi-5.jpg")],
-    tags: ["Skin Care", "Joint & Pain Relief"],
+    tags: ["Skin Care", "Sakit sa balat", "Joint & Pain Relief", "sakit sa katawan"],
     about:
       "Kamantigi, also called garden balsam, is a colorful flowering plant that Filipinos like to grow in gardens and pots. Its blooms come in pink, red, purple, or white, and they grow along the stem among the leaves. Beyond its beauty, its fresh leaves are used in simple skin remedies: crushed and applied to soothe irritation, small skin infections, and swollen or achy spots. Many people also know the flowers for another use — crushed petals were traditionally used to give fingernails a temporary reddish color, like a natural nail polish.",
     benefits: [
@@ -709,7 +719,7 @@ export const PLANTS: Plant[] = [
     family: "Oxalidaceae (Wood-sorrel family)",
     imageUrl: require("@/assets/images/plants/kamias.jpg"),
     images: [require("@/assets/images/plants/kamias.jpg"), require("@/assets/images/plants/kamias-2.jpg"), require("@/assets/images/plants/kamias-3.jpg"), require("@/assets/images/plants/kamias-4.jpg"), require("@/assets/images/plants/kamias-5.jpg")],
-    tags: ["Cough", "Skin Care"],
+    tags: ["Cough", "Ubo", "Skin Care", "Sakit sa balat"],
     about:
       "Kamias is a tree with small, green, cucumber-shaped fruits that grow in bunches straight out of the trunk and branches. The fruit is very sour and is a common souring ingredient in Filipino dishes such as sinigang and paksiw, and it is also made into pickles and preserves. Beyond the kitchen, it is used in home remedies for cough and for skin problems like pimples and boils, and in traditional use it is linked to supporting healthy blood pressure. Some families also use the fruit as a natural stain remover for clothes and to clean metal.",
     benefits: [
@@ -751,7 +761,7 @@ export const PLANTS: Plant[] = [
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/lagundi.jpg"),
     images: [require("@/assets/images/plants/lagundi.jpg"), require("@/assets/images/plants/lagundi-2.jpg"), require("@/assets/images/plants/lagundi-3.jpg"), require("@/assets/images/plants/lagundi-4.jpg"), require("@/assets/images/plants/lagundi-5.jpg")],
-    tags: ["Cough", "Fever"],
+    tags: ["Cough", "Ubo", "Fever", "Lagnat"],
     about:
       "Lagundi is one of the most popular and trusted medicinal plants in the Philippines. It is recognized by the Department of Health for its traditional use for cough, colds, and asthma-like symptoms — it does not cure asthma or any respiratory disease — and it is the main ingredient in many cough syrups and tablets sold in Philippine pharmacies. The plant has distinctive leaves that spread out like the fingers of a hand, and it is often grown as a hedge so the leaves are always ready to pick. Many families make a warm leaf drink at the first sign of a cough or cold, and it is also available in ready-made forms for people who want a convenient and consistent option.",
     benefits: [
@@ -793,7 +803,7 @@ export const PLANTS: Plant[] = [
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/madre-de-cacao.jpg"),
     images: [require("@/assets/images/plants/madre-de-cacao.jpg"), require("@/assets/images/plants/madre-de-cacao-2.jpg"), require("@/assets/images/plants/madre-de-cacao-3.jpg"), require("@/assets/images/plants/madre-de-cacao-4.jpg"), require("@/assets/images/plants/madre-de-cacao-5.jpg")],
-    tags: ["Skin Care", "Wound"],
+    tags: ["Skin Care", "Sakit sa balat", "Wound", "Sugat"],
     about:
       "Madre de Cacao, known locally as \"kakawate,\" is a fast-growing tree that is often used as a living fence and as shade for cacao plants, which is how it got its Spanish name meaning \"mother of cacao.\" In spring, it is covered with pink and white flowers. Its leaves have a distinct, slightly bitter smell, and they are used in home remedies for skin problems like fungus, itchy rashes, and scabies, as well as for cleaning minor wounds. Farmers also use it in the fields to keep the soil healthy and sometimes to treat skin problems in farm animals.",
     benefits: [
@@ -830,7 +840,7 @@ export const PLANTS: Plant[] = [
     family: "Moringaceae",
     imageUrl: require("@/assets/images/plants/malungay.jpg"),
     images: [require("@/assets/images/plants/malungay.jpg"), require("@/assets/images/plants/malungay-2.jpg"), require("@/assets/images/plants/malungay-3.jpg"), require("@/assets/images/plants/malungay-4.jpg"), require("@/assets/images/plants/malungay-5.jpg")],
-    tags: ["Nutrition & Immunity"],
+    tags: ["Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Malunggay, also known as moringa, is often called the \"miracle tree\" because its small leaves are full of nutrition. It is a staple in Filipino soups like tinola and monggo, and health workers regularly recommend it for growing children, breastfeeding mothers, and anyone recovering from sickness or low energy. The tree grows easily in the backyard, even from a simple branch cutting, and its leaves can be picked all year. The long green pods are also cooked in soups and stews, and the leaves can be dried and ground into a powder for use in drinks and food.",
     benefits: [
@@ -872,7 +882,7 @@ export const PLANTS: Plant[] = [
     family: "Anacardiaceae (Cashew family)",
     imageUrl: require("@/assets/images/plants/manga.jpg"),
     images: [require("@/assets/images/plants/manga.jpg"), require("@/assets/images/plants/manga-2.jpg"), require("@/assets/images/plants/manga-3.jpg"), require("@/assets/images/plants/manga-4.jpg"), require("@/assets/images/plants/manga-5.jpg")],
-    tags: ["Digestive Health", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Manga, or mango, is the national fruit of the Philippines and is loved for its sweet, juicy golden flesh. Besides being a favorite fruit, it has a role in home remedies. The young leaves are boiled into a tea for digestive comfort, and the ripe fruit is full of vitamins that help the body stay healthy, especially in the hot months. Green mango is enjoyed as a sour snack with salt or bagoong, while ripe mango is eaten fresh, in shakes, dried, or in desserts like mango float.",
     benefits: [
@@ -914,7 +924,7 @@ export const PLANTS: Plant[] = [
     family: "Clusiaceae (Mangosteen family)",
     imageUrl: require("@/assets/images/plants/mangosteen.jpg"),
     images: [require("@/assets/images/plants/mangosteen.jpg"), require("@/assets/images/plants/mangosteen-2.jpg"), require("@/assets/images/plants/mangosteen-3.jpg"), require("@/assets/images/plants/mangosteen-4.jpg"), require("@/assets/images/plants/mangosteen-5.jpg")],
-    tags: ["Digestive Health", "Joint & Pain Relief", "Nutrition & Immunity"],
+    tags: ["Digestive Health","Problema sa tiyan", "Joint & Pain Relief", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Mangosteen is a slow-growing tropical tree, and its fruit is often called the \"queen of fruits.\" Inside the thick, deep-purple rind is sweet-sour, juicy white flesh that is divided into soft segments. While people mostly enjoy the flesh, the rind is what is traditionally used for home remedies — it is dried and boiled into a deep red tea for upset stomach and loose bowel movement, and it is also used in some traditional skin care. Research on the rind's compounds so far is experimental — laboratory and animal studies — and is not proof of any clinical treatment. Mangosteen is a treat for the season and a favorite in southern Philippines, where the trees grow best.",
     benefits: [
@@ -951,7 +961,7 @@ export const PLANTS: Plant[] = [
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/oregano.jpg"),
     images: [require("@/assets/images/plants/oregano.jpg"), require("@/assets/images/plants/oregano-2.jpg"), require("@/assets/images/plants/oregano-3.jpg"), require("@/assets/images/plants/oregano-4.jpg"), require("@/assets/images/plants/oregano-5.jpg")],
-    tags: ["Cough"],
+    tags: ["Cough", "Ubo"],
     about:
       "The oregano used in Philippine home remedies, also known as \"suganda,\" is a thick, fuzzy-leafed plant with a strong, sharp, slightly minty smell when crushed. It is different from the oregano used on pizza, even though they share a name. It is one of the most trusted household remedies for cough and sore throat, and many families grow it in a small pot near the kitchen so a fresh leaf is always at hand. The leaves are often boiled into a warm tea, sometimes with honey, or their juice is squeezed out and taken by the spoonful for a cough.",
     benefits: [
@@ -993,7 +1003,7 @@ export const PLANTS: Plant[] = [
     family: "Pandanaceae (Screwpine family)",
     imageUrl: require("@/assets/images/plants/pandan.jpg"),
     images: [require("@/assets/images/plants/pandan.jpg"), require("@/assets/images/plants/pandan-2.jpg"), require("@/assets/images/plants/pandan-3.jpg"), require("@/assets/images/plants/pandan-4.jpg"), require("@/assets/images/plants/pandan-5.jpg")],
-    tags: ["Digestive Health", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Pandan is a fragrant plant with long, green, blade-like leaves, loved across the Philippines and Southeast Asia for its sweet, grassy, almost vanilla-like smell. It is used to flavor rice, sweet treats like buko pandan, and cool drinks. Pandan tea is also a comforting home drink for relaxing and easing mild stomach discomfort after meals. Some families place fresh leaves in the kitchen, refrigerator, or car simply to enjoy the pleasant scent. It grows in clumps in the garden and is easy to keep going year-round.",
     benefits: [
@@ -1035,7 +1045,7 @@ export const PLANTS: Plant[] = [
     family: "Piperaceae (Pepper family)",
     imageUrl: require("@/assets/images/plants/pansit-pansitan.jpg"),
     images: [require("@/assets/images/plants/pansit-pansitan.jpg"), require("@/assets/images/plants/pansit-pansitan-2.jpg"), require("@/assets/images/plants/pansit-pansitan-3.jpg"), require("@/assets/images/plants/pansit-pansitan-4.jpg"), require("@/assets/images/plants/pansit-pansitan-5.jpg")],
-    tags: ["Joint & Pain Relief"],
+    tags: ["Joint & Pain Relief", "sakit sa katawan"],
     about:
       "Pansit-pansitan is a small, soft-stemmed herb with heart-shaped, shiny leaves that grows in damp, shaded places around houses, gardens, and cracks in walls. Many people treat it as a weed, but it is well known in the Philippines as a home remedy for gout and joint pain, and it is one of the herbal plants recognized for this use by the Department of Health. It is also eaten as a fresh, slightly peppery, crunchy salad green. A regular cup of pansit-pansitan tea is popular among people who suffer from joint pain and stiffness.",
     benefits: [
@@ -1077,7 +1087,7 @@ export const PLANTS: Plant[] = [
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/peanut.jpg"),
     images: [require("@/assets/images/plants/peanut.jpg"), require("@/assets/images/plants/peanut-2.jpg"), require("@/assets/images/plants/peanut-3.jpg"), require("@/assets/images/plants/peanut-4.jpg"), require("@/assets/images/plants/peanut-5.jpg")],
-    tags: ["Nutrition & Immunity"],
+    tags: ["Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Peanut is a popular crop that grows its pods underground, and is valued in the Philippines as an affordable, filling source of protein and healthy fats. It is not made into medicine like a leaf tea, but it is an important food for keeping strong and energetic, especially during recovery from illness. Filipinos enjoy peanuts boiled, roasted, fried with garlic, or turned into peanut butter, kare-kare sauce, and brittle. A small handful makes a satisfying snack that keeps hunger away for hours.",
     benefits: [
@@ -1119,7 +1129,7 @@ export const PLANTS: Plant[] = [
     family: "Rutaceae (Citrus family)",
     imageUrl: require("@/assets/images/plants/pomelo.jpg"),
     images: [require("@/assets/images/plants/pomelo.jpg"), require("@/assets/images/plants/pomelo-2.jpg"), require("@/assets/images/plants/pomelo-3.jpg"), require("@/assets/images/plants/pomelo-4.jpg"), require("@/assets/images/plants/pomelo-5.jpg")],
-    tags: ["Nutrition & Immunity", "Digestive Health"],
+    tags: ["Nutrition & Immunity", "Pampalakas ng katawan","Digestive Health","Problema sa tiyan"],
     about:
       "Pomelo, locally called suha, is the largest citrus fruit in the world. It has a very thick rind, a thick white layer under the skin, and large, juicy segments with a mild, sweet-sour taste. It is a favorite fruit in the Philippines, especially in provinces known for their sweet varieties, and it is often shared at family gatherings, during holidays, and as a fresh dessert after a heavy meal. It is a good source of vitamin C and is popularly eaten during cold and flu season to keep the body strong.",
     benefits: [
@@ -1161,7 +1171,7 @@ export const PLANTS: Plant[] = [
     family: "Malvaceae (Mallow family)",
     imageUrl: require("@/assets/images/plants/saluyot.jpg"),
     images: [require("@/assets/images/plants/saluyot.jpg"), require("@/assets/images/plants/saluyot-2.jpg"), require("@/assets/images/plants/saluyot-3.jpg"), require("@/assets/images/plants/saluyot-4.jpg"), require("@/assets/images/plants/saluyot-5.jpg")],
-    tags: ["Digestive Health", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Saluyot is a leafy green vegetable that is especially popular in Ilocano cooking. When cooked, it becomes slightly slippery and sticky, like okra, which many people love in soups and stews. It is full of vitamins, minerals, and fiber; eaten regularly, it is a gentle traditional food for easing mild constipation rather than a therapeutic treatment. It is often cooked simply with garlic, onion, and a bit of dried fish or bagoong, and served with rice. Many families grow it at home because it sprouts quickly and gives a steady supply of fresh greens at little cost.",
     benefits: [
@@ -1198,7 +1208,7 @@ export const PLANTS: Plant[] = [
     family: "Asteraceae (Daisy family)",
     imageUrl: require("@/assets/images/plants/sambong.jpg"),
     images: [require("@/assets/images/plants/sambong.jpg"), require("@/assets/images/plants/sambong-2.jpg"), require("@/assets/images/plants/sambong-3.jpg"), require("@/assets/images/plants/sambong-4.jpg"), require("@/assets/images/plants/sambong-5.jpg")],
-    tags: ["Kidney & Urinary"],
+    tags: ["Kidney & Urinary", "Bato sa bato"],
     about:
       "Sambong is a leafy shrub with large, soft, fuzzy leaves that give off a strong, refreshing smell when crushed, similar to camphor. It is one of the herbal plants recommended by the Department of Health and is sold in pharmacies as tablets and capsules. It is well known for helping the body pass water more easily and is traditionally used for kidney and urinary comfort, including small kidney stones and swelling from water retention. It is usually taken along with plenty of water to help the body flush out the urinary system.",
     benefits: [
@@ -1240,7 +1250,7 @@ export const PLANTS: Plant[] = [
     family: "Fabaceae (Legume family)",
     imageUrl: require("@/assets/images/plants/sampaloc.jpg"),
     images: [require("@/assets/images/plants/sampaloc.jpg"), require("@/assets/images/plants/sampaloc-2.jpg"), require("@/assets/images/plants/sampaloc-3.jpg"), require("@/assets/images/plants/sampaloc-4.jpg"), require("@/assets/images/plants/sampaloc-5.jpg")],
-    tags: ["Digestive Health", "Nutrition & Immunity"],
+    tags: ["Digestive Health", "Problema sa tiyan", "Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Sampaloc, or tamarind, is a large, shady tree that lives for a very long time. Its brown pods hold sticky, tangy pulp that is the star of sinigang, the favorite Filipino sour soup. The pulp is also made into candies, jams, and drinks, and is used at home to gently support digestion and relieve constipation. The young leaves and flowers are also cooked into dishes, and the leaves are used in some home remedies for mild fever. Old sampaloc trees are often treated as landmarks in towns and villages.",
     benefits: [
@@ -1282,7 +1292,7 @@ export const PLANTS: Plant[] = [
     family: "Phyllanthaceae",
     imageUrl: require("@/assets/images/plants/sampasampalukan.jpg"),
     images: [require("@/assets/images/plants/sampasampalukan.jpg"), require("@/assets/images/plants/sampasampalukan-2.jpg"), require("@/assets/images/plants/sampasampalukan-3.jpg"), require("@/assets/images/plants/sampasampalukan-4.jpg"), require("@/assets/images/plants/sampasampalukan-5.jpg")],
-    tags: ["Kidney & Urinary"],
+    tags: ["Kidney & Urinary", "Bato sa bato"],
     about:
       "Sampasampalukan is a small, weedy plant with thin stems and tiny, paired leaves that look like miniature tamarind leaves, which is where its name comes from. It is found growing in gardens, sidewalks, and open fields. It is internationally known as \"stonebreaker\" because of its long-standing use to support the kidneys and urinary system, especially for people concerned about small kidney stones. It is usually prepared as a whole-plant tea and taken along with plenty of water. It is also used in folk practice to support the liver. Research on this plant has mostly been experimental, so its uses should be understood as traditional rather than clinically proven.",
     benefits: [
@@ -1319,7 +1329,7 @@ export const PLANTS: Plant[] = [
     family: "Solanaceae (Nightshade family)",
     imageUrl: require("@/assets/images/plants/siling-labuyo.jpg"),
     images: [require("@/assets/images/plants/siling-labuyo.jpg"), require("@/assets/images/plants/siling-labuyo-2.jpg"), require("@/assets/images/plants/siling-labuyo-3.jpg"), require("@/assets/images/plants/siling-labuyo-4.jpg"), require("@/assets/images/plants/siling-labuyo-5.jpg")],
-    tags: ["Joint & Pain Relief", "Nutrition & Immunity"],
+    tags: ["Joint & Pain Relief", "sakit sa katawan","Nutrition & Immunity","Pampalakas ng katawan"],
     about:
       "Siling labuyo is a small but very hot chili native to the Philippines, and a key ingredient in dishes like bicol express and dipping sauces. The small, pointy fruits turn from green to bright red as they ripen. Its heat comes from capsaicin, the plant compound studied for its warming, pain-relieving action on the skin, and it is also why people use it, carefully diluted in oil, as a rub for sore muscles and joints. In the kitchen, a little goes a long way, adding flavor and a healthy kick to meals. It is easy to grow in a pot at home and produces fruit for a long time.",
     benefits: [
@@ -1361,7 +1371,7 @@ export const PLANTS: Plant[] = [
     family: "Convolvulaceae (Morning glory family)",
     imageUrl: require("@/assets/images/plants/sweet-potato.jpg"),
     images: [require("@/assets/images/plants/sweet-potato.jpg"), require("@/assets/images/plants/sweet-potato-2.jpg"), require("@/assets/images/plants/sweet-potato-3.jpg"), require("@/assets/images/plants/sweet-potato-4.jpg"), require("@/assets/images/plants/sweet-potato-5.jpg")],
-    tags: ["Nutrition & Immunity", "Digestive Health"],
+    tags: ["Nutrition & Immunity", "Pampalakas ng katawan","Digestive Health","Problema sa tiyan"],
     about:
       "Sweet potato, known as kamote, is a nutritious root crop grown all over the Philippines. The roots may be orange, yellow, white, or purple, and are naturally sweet. The young leaves, called talbos ng kamote, are also eaten as a tender green vegetable. Kamote is filling and gentle on the stomach, making it a common food for growing kids and for people needing steady energy, and it is often a lifesaver during lean seasons. It is enjoyed boiled, steamed, roasted, fried as camote-cue, or baked into sweet treats.",
     benefits: [
@@ -1403,7 +1413,7 @@ export const PLANTS: Plant[] = [
     family: "Apiaceae (Carrot family)",
     imageUrl: require("@/assets/images/plants/takip-kohol.jpg"),
     images: [require("@/assets/images/plants/takip-kohol.jpg"), require("@/assets/images/plants/takip-kohol-2.jpg"), require("@/assets/images/plants/takip-kohol-3.jpg"), require("@/assets/images/plants/takip-kohol-4.jpg"), require("@/assets/images/plants/takip-kohol-5.jpg")],
-    tags: ["Wound", "Joint & Pain Relief"],
+    tags: ["Wound","Sugat", "Joint & Pain Relief", "sakit sa katawan"],
     about:
       "Takip-kohol, also called gotu kola, is a low, creeping herb with small, round, coin-shaped leaves that grows in wet, shady places like rice paddy edges and garden corners. It is well known in traditional medicine across Asia for helping the skin heal and for supporting the mind and circulation. In many communities, the leaves are eaten as a fresh salad green or made into tea, and crushed leaves are placed on small wounds. It is also becoming popular in skin care products, so fresh leaves are a natural, homegrown version of a well-loved ingredient.",
     benefits: [
@@ -1445,7 +1455,7 @@ export const PLANTS: Plant[] = [
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/tawa-tawa.jpg"),
     images: [require("@/assets/images/plants/tawa-tawa.jpg"), require("@/assets/images/plants/tawa-tawa-2.jpg"), require("@/assets/images/plants/tawa-tawa-3.jpg"), require("@/assets/images/plants/tawa-tawa-4.jpg"), require("@/assets/images/plants/tawa-tawa-5.jpg")],
-    tags: ["Fever", "Cough"],
+    tags: ["Fever", "Lagnat","Cough","Ubo"],
     about:
       "Tawa-tawa is a small, hairy plant that grows low to the ground in vacant lots, sidewalk cracks, and open fields all over the Philippines. It became widely talked about as a home remedy during dengue outbreaks, when many families boiled it into a tea as a first response. It is important to understand that this is only a supportive folk practice and never a replacement for proper medical care. Anyone with a high or lasting fever, or any signs of dengue, should see a doctor immediately. Tawa-tawa is also used at home for mild fevers and cough.",
     benefits: [
@@ -1477,7 +1487,7 @@ export const PLANTS: Plant[] = [
     family: "Boraginaceae (Borage family)",
     imageUrl: require("@/assets/images/plants/tsaang-gubat.jpg"),
     images: [require("@/assets/images/plants/tsaang-gubat.jpg"), require("@/assets/images/plants/tsaang-gubat-2.jpg"), require("@/assets/images/plants/tsaang-gubat-3.jpg"), require("@/assets/images/plants/tsaang-gubat-4.jpg"), require("@/assets/images/plants/tsaang-gubat-5.jpg")],
-    tags: ["Indigestion", "Digestive Health"],
+    tags: ["Indigestion", "Sakit ng tiyan", "Digestive Health", "Problema sa tiyan"],
     about:
       "Tsaang gubat, which means \"forest tea,\" is a small shrub with tiny, shiny, dark green leaves and small white flowers. It is one of the herbal plants recommended by the Department of Health, and has been brewed as a household tea for generations for stomach complaints. (Its scientific name is Ehretia microphylla, also listed in some references under the older synonym Carmona retusa.) It is a go-to for stomach ache, indigestion, and loose bowel movement. It is also sold as a ready-to-use herbal tea bag in Philippine drugstores and supermarkets, so it is easy to enjoy even without a plant at home. The tea has a mild and pleasant taste.",
     benefits: [
@@ -1519,7 +1529,7 @@ export const PLANTS: Plant[] = [
     family: "Euphorbiaceae (Spurge family)",
     imageUrl: require("@/assets/images/plants/tuba.jpg"),
     images: [require("@/assets/images/plants/tuba.jpg"), require("@/assets/images/plants/tuba-2.jpg"), require("@/assets/images/plants/tuba-3.jpg"), require("@/assets/images/plants/tuba-4.jpg"), require("@/assets/images/plants/tuba-5.jpg")],
-    tags: ["Wound", "Skin Care"],
+    tags: ["Wound", "Sugat", "Skin Care", "Sakit sa balat"],
     about:
       "Tuba, also called physic nut, is a tough shrub that is often planted as a living fence because it grows with almost no care. Many parts of the plant are harmful if swallowed, especially the seeds, and it must always be handled with care. In traditional practice, the milky sap from a fresh stem has been used on the skin in a brief, careful way for small cuts. The plant's seeds have also been studied in other countries as a possible source of biofuel, though this has nothing to do with its home use. Because of its risks, tuba is one of the plants in this guide that should be used with the most caution.",
     benefits: [
@@ -1549,7 +1559,7 @@ export const PLANTS: Plant[] = [
     family: "Zingiberaceae (Ginger family)",
     imageUrl: require("@/assets/images/plants/turmeric.jpg"),
     images: [require("@/assets/images/plants/turmeric.jpg"), require("@/assets/images/plants/turmeric-2.jpg"), require("@/assets/images/plants/turmeric-3.jpg"), require("@/assets/images/plants/turmeric-4.jpg"), require("@/assets/images/plants/turmeric-5.jpg")],
-    tags: ["Joint & Pain Relief", "Nutrition & Immunity"],
+    tags: ["Joint & Pain Relief", "sakit sa katawan","Nutrition & Immunity", "Pampalakas ng katawan"],
     about:
       "Turmeric, known locally as luyang dilaw, is a golden-yellow root related to ginger. It is used in Philippine cooking to color and flavor rice, curries, and stews, and it is one of the best-known traditional home remedies for aches and swelling — its curcumin compounds have been studied for biological activity in laboratories, but that is not proof that turmeric cures any disease. Fresh turmeric has a warm, earthy, slightly bitter taste, and it stains anything it touches bright yellow. A warm cup of turmeric tea is a popular home drink for stiff joints and general comfort. It is easy to grow at home by planting a piece of fresh root in soil.",
     benefits: [
@@ -1591,7 +1601,7 @@ export const PLANTS: Plant[] = [
     family: "Amaranthaceae (Amaranth family)",
     imageUrl: require("@/assets/images/plants/uray.jpg"),
     images: [require("@/assets/images/plants/uray.jpg"), require("@/assets/images/plants/uray-2.jpg"), require("@/assets/images/plants/uray-3.jpg"), require("@/assets/images/plants/uray-4.jpg"), require("@/assets/images/plants/uray-5.jpg")],
-    tags: ["Fever", "Digestive Health", "Kidney & Urinary"],
+    tags: ["Fever","Lagnat", "Digestive Health", "Problema sa tiyan", "Kidney & Urinary", "Bato sa bato"],
     about:
       "Uray, also known as spiny amaranth, is a leafy plant that grows wild across the Philippines and is easy to recognize by the small, sharp spines at the base of its leaves. Many families gather it as a free vegetable, cooking the tender young leaves like spinach. It is also boiled into tea in traditional home use, where it is valued as a mild way to help the body pass water and to ease mild fever, making it a useful two-in-one plant in rural homes. It grows quickly in the rainy season and is often found along paths and in gardens.",
     benefits: [
@@ -1633,7 +1643,7 @@ export const PLANTS: Plant[] = [
     family: "Lamiaceae (Mint family)",
     imageUrl: require("@/assets/images/plants/yerba-buena.jpg"),
     images: [require("@/assets/images/plants/yerba-buena.jpg"), require("@/assets/images/plants/yerba-buena-2.jpg"), require("@/assets/images/plants/yerba-buena-3.jpg"), require("@/assets/images/plants/yerba-buena-4.jpg"), require("@/assets/images/plants/yerba-buena-5.jpg")],
-    tags: ["Joint & Pain Relief", "Digestive Health"],
+    tags: ["Joint & Pain Relief","sakit sa katawan", "Digestive Health", "Problema sa tiyan"],
     about:
       "Yerba buena is a Philippine mint that spreads easily in gardens and pots, and is known for its fresh, cooling smell. Its name is Spanish for \"good herb,\" and it lives up to that name in Filipino homes as a go-to remedy for headaches, stomach aches, and minor muscle pain. It can be drunk as a warm tea or crushed and rubbed on the skin. Chewing a leaf on a bumpy bus ride is a common trick to ease queasiness. Its cool, fresh scent also makes it a pleasant plant to have near the kitchen window.",
     benefits: [

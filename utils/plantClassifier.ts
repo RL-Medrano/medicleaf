@@ -43,11 +43,11 @@ const CONFIDENCE_THRESHOLD = 0.70;
 
 // Similar Medicinal Plant screen (offered from the failure state):
 // candidates are the classes the model scored within SIMILAR_PLANT_RATIO
-// of its best guess — e.g. a 45% top score keeps everything ≥ 27% — shown
+// of its best guess — e.g. a 45% top score keeps everything ≥ 13.5% — shown
 // best-first and capped at MAX_SIMILAR_PLANTS. The cutoff is relative on
 // purpose: an absolute floor (e.g. ≥ 60%) would show nothing at all on
 // most failed scans, where the top score is usually far below it.
-const SIMILAR_PLANT_RATIO = 0.6;
+const SIMILAR_PLANT_RATIO = 0.3;
 const MAX_SIMILAR_PLANTS = 5;
 
 export type PlantDetails = {
