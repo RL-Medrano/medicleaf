@@ -72,12 +72,12 @@ export const PLANTS: Plant[] = [
       {
         title: "Fresh-leaf rub",
         instructions:
-          "Pick some fresh, healthy leaves and wash them well. Crush or rub them between your palms until the juice comes out. Clean the affected area with mild soap and water, pat it dry, then rub the crushed leaves directly onto the skin. Do this regularly, or until the skin clears. Use freshly crushed leaves each time.",
+          "Pick some fresh, healthy leaves and wash them well. Crush or rub them between your palms until the juice comes out. Clean the affected area with mild soap and water, pat it dry, then rub the crushed leaves directly onto the skin. Apply 2 times a day and continue daily for up to 3 weeks until the skin clears. Use freshly crushed leaves each time.",
       },
       {
         title: "Leaf decoction wash",
         instructions:
-          "Boil the chopped leaves in water, then let it cool completely and strain. Use the liquid to wash the affected area, patting the skin dry afterward. Keep any leftover liquid in a clean, covered container in the refrigerator and use it soon.",
+          "Boil 1 glass of ground, freshly picked leaves in 2 glasses of water until about 1 glass of liquid is left, then let it cool completely and strain. Use the liquid to wash the affected area 2 times a day, for up to 3 weeks, patting the skin dry afterward. Keep any leftover liquid in a clean, covered container in the refrigerator and use it soon.",
       },
       {
         title: "Leaf paste",
@@ -198,7 +198,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Leaf tea",
         instructions:
-          "Wash some fresh leaves, chop them, and boil in water. Strain and drink a small cupful, ideally before meals. The taste is bitter, so you can add a little ginger, but avoid adding sugar.",
+          "Wash some fresh leaves, chop them, and boil in water. Strain and drink a small cupful, ideally before meals. The taste is bitter, so you can add a little ginger, but avoid adding sugar. For blood-sugar support, a health professional may advise eating about 1 cup of leaves twice a day (as a salad or in meals), or boiling 2 cups of sprouts in 2 glasses of water for about 15 minutes until only half remains, then drinking half a glass 3 times a day, about 30 minutes before meals.",
       },
       {
         title: "Sautéed fruit dish",
@@ -408,7 +408,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Wound wash",
         instructions:
-          "Wash some fresh leaves and boil in water. Let it cool fully, strain, and use the liquid to rinse the wound regularly. Make a fresh batch each time.",
+          "Wash some fresh leaves and boil 1 to 2 handfuls of leafy tops in a small pot of water. Let it cool fully, strain, and use the lukewarm liquid to rinse the wound, 2 times a day until it heals. Make a fresh batch each time.",
       },
       {
         title: "Digestive decoction",
@@ -418,7 +418,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Mouth rinse",
         instructions:
-          "Use the cooled decoction to gargle or rinse the mouth, to freshen breath and soothe sore gums. Spit it out afterward.",
+          "Boil 1 handful of leafy tops in a small pot of water, then use the cooled, lukewarm decoction to gargle or rinse the mouth — 2 times a day until the gums feel better — to freshen breath and soothe sore gums. Spit it out afterward.",
       },
     ],
     precautions:
@@ -776,7 +776,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Leaf decoction",
         instructions:
-          "Wash and chop some fresh leaves and boil in water until it reduces a little. Strain, let it cool a little, and drink a small cupful as needed. Make a fresh batch each time.",
+          "Wash and crush some fresh leaves. Use 1½ tablespoons for ages 2–6, 3 tablespoons for ages 7–12, or 6 tablespoons for ages 13 and above, then boil in 2 cups of water — leave the pot uncovered once it starts boiling — until only half of the water remains. Strain, let it cool a little, and drink a small cupful as needed. Make a fresh batch each time.",
       },
       {
         title: "Commercial preparation",
@@ -1060,12 +1060,12 @@ export const PLANTS: Plant[] = [
       {
         title: "Whole-plant decoction",
         instructions:
-          "Wash some of the whole plant (leaves and stems) very well, since it grows close to the ground. Boil in water, strain, and drink a small cupful for joint support, using it regularly for long-term use.",
+          "Wash some of the whole plant (leaves and stems) very well, since it grows close to the ground. A doctor may advise boiling 3 cups (about 1½ glasses, not packed) in 2 glasses of water for about 15 minutes, until only half the water remains, then straining and drinking half a glass 3 times a day after eating — use it regularly for long-term joint support.",
       },
       {
         title: "Fresh salad green",
         instructions:
-          "Wash fresh leaves and tender stems thoroughly and eat raw in a salad with tomatoes, onions, and a light dressing, or add to soups near the end of cooking.",
+          "Wash fresh leaves and tender stems thoroughly and eat raw in a salad with tomatoes, onions, and a light dressing, or add to soups near the end of cooking. A doctor may advise eating about 1 cup (not packed) of leafy tops three times a day.",
       },
       {
         title: "Leaf poultice",
@@ -1223,7 +1223,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Leaf decoction",
         instructions:
-          "Wash some fresh leaves and boil in water. Strain and drink a small cupful as needed, together with plenty of plain water.",
+          "Wash some fresh leaves. Use 3 tablespoons of minced leaves for ages 7–12, or 6 tablespoons for ages 13 and above, then boil in 2 glasses of water — with the lid off — until only about half remains. Let it cool, strain, and divide into 3 portions; drink 1 portion 3 times a day, together with plenty of plain water — at least 12 glasses daily.",
       },
       {
         title: "Commercial capsules",
@@ -1502,7 +1502,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Fresh or dried leaf decoction",
         instructions:
-          "Wash some fresh or dried leaves and boil in water. Strain and drink warm, a small cupful after meals or as needed for stomach discomfort.",
+          "Wash some fresh or dried leaves. Use 1½ tablespoons of chopped leaves for ages 7–12, or 3 tablespoons for ages 13 and above, then boil in 1 glass of water — with the lid off — until only half remains. This is not recommended for children below 7 years old. Let it cool, strain, and drink warm, a small cupful after meals or as needed for stomach discomfort.",
       },
       {
         title: "Commercial tea bags",
@@ -1658,7 +1658,7 @@ export const PLANTS: Plant[] = [
       {
         title: "Leaf tea",
         instructions:
-          "Wash some fresh leaves and boil in water. Strain and drink warm for headache or stomach ache relief, as needed.",
+          "Wash some fresh leaves. Use 3 tablespoons of minced leaves for ages 7–12, or 6 tablespoons for ages 13 and above, then boil in 2 glasses of water until only about half remains. Let it cool, strain, and divide into 2 portions — drink 1 portion warm for headache or stomach ache relief, and the second portion after 3–4 hours if the pain persists.",
       },
       {
         title: "Topical rub",
